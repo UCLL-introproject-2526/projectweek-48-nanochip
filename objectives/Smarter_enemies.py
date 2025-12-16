@@ -4,55 +4,27 @@ import math
 import pygame
 import random
 from random import choices
-# --------------------
-# INIT
-# --------------------
-pygame.init()
-WIDTH, HEIGHT = 800, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Spaceship Game")
-clock = pygame.time.Clock()
 
-# --------------------
-# COLORS
-# --------------------
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-
-# --------------------
-# PLAYER
-# --------------------
-player_width, player_height = 50, 40
-player_x = WIDTH // 2 - player_width // 2
-player_y = HEIGHT - 70
-player_speed = 6
-
-# --------------------
-# BULLETS
-# --------------------
-bullets = []
-bullet_speed = 8
-
-# --------------------
-# ENEMIES
-# --------------------
-enemies = []
-enemy_speed = 3
-spawn_timer = 0
-
-# --------------------
-# SCORE
-# --------------------
-score = 0
-font = pygame.font.SysFont(None, 36)
-
-def draw_player(x, y):
-    pygame.draw.polygon(
-        screen,
-        WHITE,
-        [(x, y + player_height), (x + player_width // 2, y), (x + player_width, y + player_height)]
+def spawn_enemy(enemies, width):
+    enemies.append(
+        pygame.Rect(random.randint(0, width - 40), -40, 40, 30)
     )
+
+def update_enemies(
+    enemies,
+    bullets,
+    enemy_speed,
+    score,
+    sound,
+    screen_height
+):
+    """
+    Handles:
+    - Enemy movement
+    - Dodging bullets
+    - Bullet collision
+    Returns updated score
+    """
 
 def draw_score():
     text = font.render(f"Score: {score}", True, WHITE)
@@ -112,45 +84,33 @@ while running:
             spawn_timer = 0 
    # ENEMY UPDATE
     for enemy in enemies[:]:
-        dodges = 1
         enemy.y += enemy_speed
-        if enemy.y > HEIGHT:
+
+        if enemy.y > screen_height:
             enemies.remove(enemy)
+            continue
 
-        # COLLISION WITH BULLETS
+        dodges = 1
+
         for bullet in bullets[:]:
-        #   def randomize_dodging():
-        #     randomize_dodging = pygame.USEREVENT + 0
-        #     pygame.time.set_timer(randomize_dodging, 5000)
-            bullet_is_threatening = False
-            dodge_to_right = enemy.x + 10
-            dodge_to_left = enemy.x - 10
-            danger_width = enemy.width
-            if abs(bullet.x - enemy.x) < danger_width:
+            bullet_is_threatening = (
+                abs(bullet.centerx - enemy.centerx) < enemy.width
+                and bullet.y < enemy.y
+            )
 
-                # bullet_is_threatening = True
-            # if abs(bullet.centerx-enemy.centerx)< danger_width and bullet.y < enemy.y:
-                bullet_is_threatening = True 
-            if bullet_is_threatening ==True:
-                if dodges > 0:
-                    choice = choices ([dodge_to_right, dodge_to_left], [0.5, 0.5])[0] 
-                    enemy.x = choice 
-                dodges = dodges - 1
-            # randomize_dodging()
+            if bullet_is_threatening and dodges > 0:
+                dodge = choices(
+                    [enemy.x - 15, enemy.x + 15],
+                    [0.5, 0.5]
+                )[0]
+                enemy.x = dodge
+                dodges -= 1
+
             if enemy.colliderect(bullet):
                 enemies.remove(enemy)
                 bullets.remove(bullet)
+                sound.play_explosion()
                 score += 1
                 break
 
-    # DRAW
-    draw_player(player_x, player_y)
-    for bullet in bullets:
-        pygame.draw.rect(screen, WHITE, bullet)
-    for enemy in enemies:
-        pygame.draw.rect(screen, RED, enemy)
-
-    draw_score()
-    pygame.display.flip()
-
-pygame.quit()
+    return score
