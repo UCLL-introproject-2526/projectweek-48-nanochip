@@ -115,7 +115,7 @@ while running:
             enemies.remove(enemy)
 
         for bullet in bullets[:]:
-            if enemy.colliderect(bullet):
+           if enemy.colliderect(bullet):
                 enemies.remove(enemy)
                 bullets.remove(bullet)
                 sound.play_explosion()  # 💥 explosion sound

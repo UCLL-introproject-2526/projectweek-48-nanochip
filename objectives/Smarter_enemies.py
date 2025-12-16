@@ -1,6 +1,6 @@
 # Simple Spaceship Game using Pygame
 # Run with: python app.py
-
+import math
 import pygame
 import random
 from random import choices
@@ -88,15 +88,28 @@ while running:
         if bullet.y < 0:
             bullets.remove(bullet)
 
+
     # ENEMY SPAWN
     spawn_timer += 1
-    if spawn_timer > 40:
+    spawn_delay = 40
+    if spawn_timer > spawn_delay:
+        # t = pygame.time.get_ticks() / 2 % 400
+        # x = t
+        # y = math.sin(t/50.0) * 100 + 200
+        # y = int(y)
+        # print(y)
         enemies.append(pygame.Rect(random.randint(0, WIDTH - 40), -40, 40, 30))
+        # enemies.append(pygame.Rect(x, y), -40, 40, 30)
+
+
         spawn_timer = 0
-    # if score > 3:
-    #     spawn_timer = 500
-    #     enemies.append(pygame.Rect(random.randint(0, WIDTH - 40), -40, 40, 30))
-    #     spawn_timer = 0 
+
+    if score > 10:
+        # spawn_timer = 0 
+        spawn_delay = 20
+        if spawn_timer > spawn_delay:
+            enemies.append(pygame.Rect(random.randint(0, WIDTH - 40), -40, 40, 30))
+            spawn_timer = 0 
    # ENEMY UPDATE
     for enemy in enemies[:]:
         dodges = 1
