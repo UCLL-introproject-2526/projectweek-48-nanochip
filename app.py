@@ -4,6 +4,8 @@
 import pygame
 import random
 # --- THÊM DÒNG NÀY: Import file health của bạn ---
+from objectives import sound  # 🔊 Sound system
+from objectives.background import Background
 from objectives import health  
 # -------------------------------------------------
 
@@ -14,6 +16,8 @@ pygame.init()
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Spaceship Game")
+
+bg = Background("spaceship.jpg", WIDTH, HEIGHT)
 clock = pygame.time.Clock()
 
 # --------------------
@@ -78,15 +82,19 @@ def draw_score():
 running = True
 while running:
     clock.tick(60)
-    screen.fill(BLACK)
 
     # EVENTS
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                bullets.append(pygame.Rect(player_x + player_width // 2 - 3, player_y, 6, 12))
+                bullets.append(
+                    pygame.Rect(player_x + player_width // 2 - 3, player_y, 6, 12)
+                )
+                sound.play_shoot()  # 🔊 shoot sound
+    
 
     # INPUT
     keys = pygame.key.get_pressed()
@@ -94,6 +102,11 @@ while running:
         player_x -= player_speed
     if keys[pygame.K_RIGHT] and player_x < WIDTH - player_width:
         player_x += player_speed
+
+    # --------------------
+    # DRAW BACKGROUND FIRST
+    # --------------------
+    bg.draw(screen)
 
     # BULLETS UPDATE
     for bullet in bullets[:]:
@@ -104,7 +117,9 @@ while running:
     # ENEMY SPAWN
     spawn_timer += 1
     if spawn_timer > 40:
-        enemies.append(pygame.Rect(random.randint(0, WIDTH - 40), -40, 40, 30))
+        enemies.append(
+            pygame.Rect(random.randint(0, WIDTH - 40), -40, 40, 30)
+        )
         spawn_timer = 0
 
     # --------------------
@@ -130,6 +145,7 @@ while running:
             if enemy.colliderect(bullet):
                 enemies.remove(enemy)
                 bullets.remove(bullet)
+                sound.play_explosion()  # 💥 explosion sound
                 score += 1
                 bullet_hit = True
                 break
