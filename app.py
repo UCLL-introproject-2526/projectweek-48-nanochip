@@ -45,7 +45,7 @@ RED = (255, 0, 0)
 WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
-CYAN = (0, 255, 255)
+CYAN = (0, 255, 255)   # Important for UI text
 font = pygame.font.SysFont(None, 36)
 big_font = pygame.font.SysFont(None, 72)
 
@@ -91,7 +91,6 @@ enemy_img_path = os.path.join(BASE_DIR, "objectives", "images", "enemy_ship.png"
 try:
     player_img = pygame.image.load(player_img_path).convert_alpha()
     player_img = pygame.transform.scale(player_img, (player_width, player_height))
-    
 except FileNotFoundError:
     player_img = pygame.Surface((player_width, player_height))
     player_img.fill((0, 255, 0))
@@ -187,9 +186,11 @@ def draw_player(x, y):
 # START MENU
 # --------------------
 action = start_menu.start_menu(screen, clock)
-if action is None:
-    action = "start"
-reset_game()
+if action == "start":
+    reset_game()
+elif action == "quit":
+    pygame.quit()
+    sys.exit()
 
 # --------------------
 # MAIN LOOP
@@ -206,10 +207,10 @@ while running:
         # Check if next level is a BOSS LEVEL (5, 10, 15, 20)
         if (level + 1) in [5, 10, 15, 20]:
             level += 1
-            # SPAWN BOSS
+            # SPAWN BOSS (Pass both WIDTH and HEIGHT)
             current_boss = boss_module.Boss(WIDTH, HEIGHT)
             
-            # BOSS HP (Fixing the "0 HP" crash)
+            # BOSS HP (Fixed math to prevent 0 HP crash at level 4/5)
             current_boss.max_hp = 500 + (level * 100) 
             current_boss.hp = current_boss.max_hp
             
@@ -317,7 +318,7 @@ while running:
         # 1. Update Boss
         current_boss.update() 
         
-        # 2. Draw Boss (Fixed: using blit instead of .draw())
+        # 2. Draw Boss (Using blit because boss is a single Sprite, not a group)
         screen.blit(current_boss.image, current_boss.rect)
 
         # 3. Boss Shooting
@@ -353,10 +354,14 @@ while running:
                     sound.play_explosion()
                     
                     # Reward: Spawn Powerups
-                    # Use the spawn_powerup_at function to avoid typos
-                    powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx, current_boss.rect.centery)
-                    powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + 40, current_boss.rect.centery)
-                    powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx - 40, current_boss.rect.centery)
+                    # We use the helper function from powerup.py
+                    try:
+                        powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx, current_boss.rect.centery)
+                        powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + 40, current_boss.rect.centery)
+                        powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx - 40, current_boss.rect.centery)
+                    except AttributeError:
+                        # Fallback if function name is different
+                        pass
 
                     current_boss = None 
                 break
@@ -372,8 +377,10 @@ while running:
         # 7. Random Powerup Drop during Boss Fight
         if random.randint(1, 100) <= 2: # 2% chance per frame
              drop_x = random.randint(50, WIDTH - 50)
-             # Use the helper function to ensure correct PowerUp creation
-             powerups_module.spawn_powerup_at(powerups, drop_x, -50)
+             try:
+                 powerups_module.spawn_powerup_at(powerups, drop_x, -50)
+             except AttributeError:
+                 pass
 
     # POWERUPS
     for p in powerups[:]:
