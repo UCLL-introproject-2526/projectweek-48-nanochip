@@ -34,7 +34,7 @@ sound.play_background_music()
 # --------------------
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Spaceship Game - Sector 48")
+pygame.display.set_caption("Spaceship Game - Levels & Bosses")
 clock = pygame.time.Clock()
 
 # --------------------
@@ -45,7 +45,7 @@ RED = (255, 0, 0)
 WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
-CYAN = (0, 255, 255)
+CYAN = (0, 255, 255)   # Important for UI text
 font = pygame.font.SysFont(None, 36)
 big_font = pygame.font.SysFont(None, 72)
 
@@ -76,13 +76,7 @@ spawn_timer = 0
 # --------------------
 GAME_RUNNING = "running"
 GAME_OVER = "over"
-GAME_PAUSED = "paused" # <--- NEW STATE
 game_state = GAME_RUNNING
-
-# --------------------
-# SHAKE EFFECT
-# --------------------
-screen_shake = 0 # Timer for shake
 
 # --------------------
 # BACKGROUND & ASSETS
@@ -128,7 +122,7 @@ shield_angle = 0
 # LEVEL SYSTEM VARIABLES
 level = 1
 next_level_score = 150
-current_boss = None
+current_boss = None  # Will hold the Boss object when active
 
 # --------------------
 # RESET GAME
@@ -138,7 +132,7 @@ def reset_game():
     global bullets, enemies, explosions, powerups
     global score, spawn_timer, last_hit_time, game_state
     global rapid_fire_active, shield_active, shield_angle
-    global level, next_level_score, current_boss, spawn_rate, screen_shake
+    global level, next_level_score, current_boss, spawn_rate
 
     player_x = WIDTH // 2 - player_width // 2
     player_y = HEIGHT - 70
@@ -153,7 +147,6 @@ def reset_game():
     score = 0
     spawn_timer = 0
     last_hit_time = 0
-    screen_shake = 0
 
     rapid_fire_active = False
     shield_active = False
@@ -207,26 +200,41 @@ while running:
     clock.tick(60)
     current_time = pygame.time.get_ticks()
 
-    # 1. EVENTS (Includes Pause Toggle)
+    # 1. LEVEL UP LOGIC
+    # Check if we reached score threshold AND we are not currently fighting a boss
+    if score >= next_level_score and current_boss is None:
+        
+        # Check if next level is a BOSS LEVEL (5, 10, 15, 20)
+        if (level + 1) in [5, 10, 15, 20]:
+            level += 1
+            # SPAWN BOSS (Pass both WIDTH and HEIGHT)
+            current_boss = boss_module.Boss(WIDTH, HEIGHT)
+            
+            # BOSS HP (Fixed math to prevent 0 HP crash at level 4/5)
+            current_boss.max_hp = 500 + (level * 100) 
+            current_boss.hp = current_boss.max_hp
+            
+            enemies.clear() # Clear small enemies
+        else:
+            # Normal Level Up
+            level += 1
+            next_level_score = level * 150
+            # Increase Difficulty
+            spawn_rate = max(10, 40 - level)
+            print(f"LEVEL UP! Welcome to Level {level}")
+
+    # 2. EVENTS
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
 
-        if event.type == pygame.KEYDOWN:
-            # PAUSE TOGGLE
-            if event.key == pygame.K_p:
-                if game_state == GAME_RUNNING:
-                    game_state = GAME_PAUSED
-                    pygame.mixer.music.pause()
-                elif game_state == GAME_PAUSED:
-                    game_state = GAME_RUNNING
-                    pygame.mixer.music.unpause()
-
-            # SHOOTING (Only if running)
-            if game_state == GAME_RUNNING and event.key == pygame.K_SPACE:
+        if game_state == GAME_RUNNING and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                # SHOOTING
                 center_x = player_x + player_width // 2 - 3
                 if rapid_fire_active:
+                    # Spray Shot
                     bullets.append([pygame.Rect(center_x, player_y, 6, 12), 0, -12])
                     bullets.append([pygame.Rect(center_x, player_y, 6, 12), -3, -10])
                     bullets.append([pygame.Rect(center_x, player_y, 6, 12), 3, -10])
@@ -234,43 +242,15 @@ while running:
                     bullets.append([pygame.Rect(center_x, player_y, 6, 12), 6, -8])
                 else:
                     bullets.append([pygame.Rect(center_x, player_y, 6, 12), 0, -8])
+                
                 sound.play_shoot()
 
-    # 2. PAUSE LOGIC
-    if game_state == GAME_PAUSED:
-        pause_text = big_font.render("PAUSED", True, WHITE)
-        screen.blit(pause_text, (WIDTH//2 - 100, HEIGHT//2 - 50))
-        pygame.display.flip()
-        continue # Skip the rest of the loop while paused
-
-    # 3. GAME OVER LOGIC
+    # GAME OVER LOGIC
     if game_state == GAME_OVER:
         action = game_over_screen(screen, clock)
         if action == "restart":
             reset_game()
         continue
-
-    # 4. CALCULATE SHAKE OFFSET
-    shake_x, shake_y = 0, 0
-    if screen_shake > 0:
-        screen_shake -= 1
-        shake_x = random.randint(-5, 5)
-        shake_y = random.randint(-5, 5)
-
-    # 5. LEVEL UP LOGIC
-    if score >= next_level_score and current_boss is None:
-        if (level + 1) in [5, 10, 15, 20]:
-            level += 1
-            # SPAWN BOSS (Pass both WIDTH and HEIGHT)
-            current_boss = boss_module.Boss(WIDTH, HEIGHT)
-            current_boss.max_hp = 500 + (level * 100) 
-            current_boss.hp = current_boss.max_hp
-            enemies.clear() 
-        else:
-            level += 1
-            next_level_score = level * 150
-            spawn_rate = max(10, 40 - level)
-            print(f"LEVEL UP! Welcome to Level {level}")
 
     # TIMERS
     if rapid_fire_active and current_time > rapid_fire_end_time:
@@ -294,9 +274,8 @@ while running:
         player_x += current_speed
         if player_x > WIDTH: player_x = -player_width
 
-    # DRAW BACKGROUND (Apply Shake)
-    # We access the image directly to apply the offset
-    screen.blit(bg.image, (shake_x, shake_y))
+    # DRAW BACKGROUND
+    bg.draw(screen)
 
     # UPDATE PLAYER BULLETS
     for b_data in bullets[:]:
@@ -309,12 +288,15 @@ while running:
     # ---------------------------
     # SPAWN & UPDATE ENEMIES OR BOSS
     # ---------------------------
+    
+    # Only spawn normal enemies if NO BOSS is active
     if current_boss is None:
         spawn_timer += 1
         if spawn_timer > spawn_rate: 
             smarter_enemies.spawn_enemy(enemies, WIDTH, 50, 40)
             spawn_timer = 0
             
+        # Update Normal Enemies
         current_enemy_speed = base_enemy_speed + (level * 0.2)
         score = smarter_enemies.update_enemies(
             enemies=enemies,
@@ -329,53 +311,62 @@ while running:
             powerups_list=powerups
         )
     else:
-        # BOSS LOGIC
+        # ==========================================
+        # BOSS FIGHT LOGIC
+        # ==========================================
+        
+        # 1. Update Boss
         current_boss.update() 
-        # Draw Boss with Shake
-        screen.blit(current_boss.image, (current_boss.rect.x + shake_x, current_boss.rect.y + shake_y))
+        
+        # 2. Draw Boss (Using blit because boss is a single Sprite, not a group)
+        screen.blit(current_boss.image, current_boss.rect)
 
+        # 3. Boss Shooting
         current_boss.bullets.update()
         current_boss.bullets.draw(screen)
 
-        # Check collision: Boss Bullets vs Player
+        # 4. Check collision: Boss Bullets vs Player
         player_rect = pygame.Rect(player_x, player_y, player_width, player_height)
+        
         for bullet in current_boss.bullets:
             if player_rect.colliderect(bullet.rect):
-                bullet.kill()
+                bullet.kill() # Remove bullet
                 if not shield_active:
+                    # Only take damage if not invincible
                     if current_time - last_hit_time > base_invincible_duration:
                         player_hp -= 15
                         last_hit_time = current_time
                         sound.play_explosion()
+                        print("Hit by Boss Bullet!")
 
-        # Check collision: Player Bullets vs Boss
+        # 5. Check collision: Player Bullets vs Boss
         for b_data in bullets[:]:
             rect = b_data[0]
             if rect.colliderect(current_boss.rect):
-                current_boss.hp -= 10
+                current_boss.hp -= 10 # Damage to boss
                 explosions.append(Explosion(rect.x, rect.y))
                 bullets.remove(b_data)
                 
-                # BOSS DEATH
+                # Check Boss Death
                 if current_boss.hp <= 0:
                     score += 500 
                     next_level_score = score + 150 
                     sound.play_explosion()
                     
-                    # TRIGGER SHAKE
-                    screen_shake = 30 
-                    
-                    # Spawn Rewards
+                    # Reward: Spawn Powerups
+                    # We use the helper function from powerup.py
                     try:
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx, current_boss.rect.centery)
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + 40, current_boss.rect.centery)
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx - 40, current_boss.rect.centery)
                     except AttributeError:
+                        # Fallback if function name is different
                         pass
+
                     current_boss = None 
                 break
         
-        # Check collision: Player vs Boss Body
+        # 6. Check collision: Player vs Boss Body
         if current_boss and player_rect.colliderect(current_boss.rect):
             if not shield_active:
                 if current_time - last_hit_time > base_invincible_duration:
@@ -383,8 +374,8 @@ while running:
                      last_hit_time = current_time
                      sound.play_explosion()
 
-        # Random Powerup Drop during Boss Fight
-        if random.randint(1, 100) <= 2:
+        # 7. Random Powerup Drop during Boss Fight
+        if random.randint(1, 100) <= 2: # 2% chance per frame
              drop_x = random.randint(50, WIDTH - 50)
              try:
                  powerups_module.spawn_powerup_at(powerups, drop_x, -50)
@@ -439,32 +430,29 @@ while running:
             rapid_fire_active = False
             shield_active = False
             current_boss = None
-            screen_shake = 0
             pygame.time.delay(800)
         else:
             sound.stop_background_music()
             sound.play_game_over()
             game_state = GAME_OVER
 
-    # DRAW PLAYER (With Shake)
+    # DRAW PLAYER
     is_hit_invincible = (current_time - last_hit_time < base_invincible_duration)
     if is_hit_invincible and not shield_active:
         if (current_time // 100) % 2 == 0:
-            draw_player(player_x + shake_x, player_y + shake_y)
+            draw_player(player_x, player_y)
     else:
-        draw_player(player_x + shake_x, player_y + shake_y)
+        draw_player(player_x, player_y)
 
     # DRAW BULLETS
     for b_data in bullets:
         rect = b_data[0]
-        # Create a temp rect for drawing with shake offset
-        draw_rect = rect.move(shake_x, shake_y)
         b_color = (255, 255, 0) if rapid_fire_active else WHITE
-        pygame.draw.rect(screen, b_color, draw_rect)
+        pygame.draw.rect(screen, b_color, rect)
 
-    # DRAW ENEMIES (With Shake)
+    # DRAW ENEMIES
     for enemy in enemies:
-        screen.blit(enemy_img, (enemy.x + shake_x, enemy.y + shake_y))
+        screen.blit(enemy_img, (enemy.x, enemy.y))
 
     # DRAW EXPLOSIONS
     for exp in explosions[:]:
@@ -480,13 +468,16 @@ while running:
     score_text = font.render(f"Score: {score}", True, WHITE)
     screen.blit(score_text, (WIDTH - 150, 10))
 
+    # DISPLAY LEVEL
     level_text = font.render(f"LEVEL {level}", True, CYAN)
     screen.blit(level_text, (WIDTH // 2 - 50, 10))
     
+    # DISPLAY BOSS WARNING
     if current_boss:
         warn_text = big_font.render("BOSS FIGHT!", True, RED)
         screen.blit(warn_text, (WIDTH // 2 - 140, HEIGHT // 2))
 
+    # BUFF TEXT
     if rapid_fire_active:
         rf_text = font.render("RAPID FIRE!", True, CYAN)
         screen.blit(rf_text, (WIDTH//2 - 60, HEIGHT - 40))
