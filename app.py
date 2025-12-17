@@ -91,6 +91,7 @@ enemy_img_path = os.path.join(BASE_DIR, "objectives", "images", "enemy_ship.png"
 try:
     player_img = pygame.image.load(player_img_path).convert_alpha()
     player_img = pygame.transform.scale(player_img, (player_width, player_height))
+    
 except FileNotFoundError:
     player_img = pygame.Surface((player_width, player_height))
     player_img.fill((0, 255, 0))

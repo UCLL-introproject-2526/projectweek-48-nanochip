@@ -15,6 +15,7 @@ def draw_segmented_bar(screen, x, y, current, max_val, color, width, height, seg
     container_width = width + 10
     container_height = height + 10
     
+    
     # Thin white border
     pygame.draw.rect(screen, WHITE, (x, y, container_width, container_height), 2, border_radius=5)
     
