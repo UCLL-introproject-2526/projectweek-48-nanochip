@@ -2,20 +2,59 @@ import pygame
 import random
 import math
 
-# Colors for the explosion particles
-FIRE_COLORS = [
-    (255, 200, 0),  # bright yellow
-    (255, 100, 0),  # orange
-    (200, 0, 0)     # red
-]
+# --------------------
+# INIT
+# --------------------
+pygame.init()
+WIDTH, HEIGHT = 800, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Spaceship Game")
+clock = pygame.time.Clock()
+
+# --------------------
+# COLORS
+# --------------------
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+FIRE_COLORS = [(255, 200, 50), (255, 140, 0), (255, 60, 0)]  # yellow → orange → red
+
+# --------------------
+# PLAYER
+# --------------------
+player_width, player_height = 50, 40
+player_x = WIDTH // 2 - player_width // 2
+player_y = HEIGHT - 70
+player_speed = 6
+
+# --------------------
+# BULLETS
+# --------------------
+bullets = []
+bullet_speed = 8
+
+# --------------------
+# ENEMIES
+# --------------------
+enemies = []
+enemy_speed = 3
+spawn_timer = 0
+
+# --------------------
+# SCORE
+# --------------------
+score = 0
+font = pygame.font.SysFont(None, 36)
+
+# --------------------
+# EXPLOSIONS
+# --------------------
+explosions = []
 
 class Explosion:
     def __init__(self, x, y):
-        """
-        Creates a particle explosion at (x, y)
-        """
         self.particles = []
-        for _ in range(25):  # number of particles
+        for _ in range(25):  # more particles for bigger explosion
             angle = random.uniform(0, 2 * math.pi)
             speed = random.uniform(2, 6)
             life = random.randint(20, 40)
