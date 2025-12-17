@@ -45,7 +45,7 @@ RED = (255, 0, 0)
 WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
-CYAN = (0, 255, 255)   # Added to fix NameError
+CYAN = (0, 255, 255)
 font = pygame.font.SysFont(None, 36)
 big_font = pygame.font.SysFont(None, 72)
 
@@ -206,10 +206,10 @@ while running:
         # Check if next level is a BOSS LEVEL (5, 10, 15, 20)
         if (level + 1) in [5, 10, 15, 20]:
             level += 1
-            # SPAWN BOSS - FIX: Passed both WIDTH and HEIGHT
+            # SPAWN BOSS
             current_boss = boss_module.Boss(WIDTH, HEIGHT)
             
-            # BOSS HP - FIX: Ensures HP is never 0
+            # BOSS HP (Fixing the "0 HP" crash)
             current_boss.max_hp = 500 + (level * 100) 
             current_boss.hp = current_boss.max_hp
             
@@ -314,16 +314,17 @@ while running:
         # BOSS FIGHT LOGIC
         # ==========================================
         
-        # 1. Update Boss Movement & Drawing
-        # NOTE: Removed WIDTH arg because your boss.py uses def update(self):
+        # 1. Update Boss
         current_boss.update() 
-        current_boss.draw(screen)
+        
+        # 2. Draw Boss (Fixed: using blit instead of .draw())
+        screen.blit(current_boss.image, current_boss.rect)
 
-        # 2. Boss Shooting (Update & Draw Bullets)
+        # 3. Boss Shooting
         current_boss.bullets.update()
         current_boss.bullets.draw(screen)
 
-        # 3. Check collision: Boss Bullets vs Player
+        # 4. Check collision: Boss Bullets vs Player
         player_rect = pygame.Rect(player_x, player_y, player_width, player_height)
         
         for bullet in current_boss.bullets:
@@ -337,7 +338,7 @@ while running:
                         sound.play_explosion()
                         print("Hit by Boss Bullet!")
 
-        # 4. Check collision: Player Bullets vs Boss
+        # 5. Check collision: Player Bullets vs Boss
         for b_data in bullets[:]:
             rect = b_data[0]
             if rect.colliderect(current_boss.rect):
@@ -352,17 +353,15 @@ while running:
                     sound.play_explosion()
                     
                     # Reward: Spawn Powerups
-                    try:
-                        powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx, current_boss.rect.centery)
-                        powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + 40, current_boss.rect.centery)
-                        powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx - 40, current_boss.rect.centery)
-                    except AttributeError:
-                        powerups.append(powerups_module.Powerup(current_boss.rect.centerx, current_boss.rect.centery, "life"))
+                    # Use the spawn_powerup_at function to avoid typos
+                    powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx, current_boss.rect.centery)
+                    powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + 40, current_boss.rect.centery)
+                    powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx - 40, current_boss.rect.centery)
 
                     current_boss = None 
                 break
         
-        # 5. Check collision: Player vs Boss Body
+        # 6. Check collision: Player vs Boss Body
         if current_boss and player_rect.colliderect(current_boss.rect):
             if not shield_active:
                 if current_time - last_hit_time > base_invincible_duration:
@@ -370,17 +369,11 @@ while running:
                      last_hit_time = current_time
                      sound.play_explosion()
 
-        # 6. Random Powerup Drop during Boss Fight (Help player)
+        # 7. Random Powerup Drop during Boss Fight
         if random.randint(1, 100) <= 2: # 2% chance per frame
              drop_x = random.randint(50, WIDTH - 50)
-             # Manually creating powerup to add to list
-             try:
-                 # Pick random type
-                 p_type = random.choice([powerups_module.EXTRA_LIFE, powerups_module.RAPID_FIRE, powerups_module.SHIELD])
-                 new_p = powerups_module.PowerUp(drop_x, -50, p_type)
-                 powerups.append(new_p)
-             except Exception:
-                 pass
+             # Use the helper function to ensure correct PowerUp creation
+             powerups_module.spawn_powerup_at(powerups, drop_x, -50)
 
     # POWERUPS
     for p in powerups[:]:
