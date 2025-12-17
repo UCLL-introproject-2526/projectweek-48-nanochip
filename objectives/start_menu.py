@@ -60,11 +60,11 @@ def start_menu(screen, clock):
         else:
             screen.fill(BLACK) # Fallback if no image
 
-        # ----------------------
-        # DRAW TITLE
-        # ----------------------
-        draw_text_centered(screen, "SECTOR 48", small_font, NEON_BLUE, 100)
-        draw_text_centered(screen, "NANOCHIP", title_font, WHITE, 150)
+        # # ----------------------
+        # # DRAW TITLE
+        # # ----------------------
+        # draw_text_centered(screen, "SECTOR 48", small_font, NEON_BLUE, 100)
+        # draw_text_centered(screen, "NANOCHIP", title_font, WHITE, 150)
 
         # ----------------------
         # DRAW MENU OPTIONS
