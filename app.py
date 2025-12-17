@@ -249,6 +249,7 @@ while running:
         if action == "restart":
             reset_game()
         continue
+    # here we go
 
     # 4. CALCULATE SHAKE OFFSET
     shake_x, shake_y = 0, 0
