@@ -21,6 +21,7 @@ from objectives.game_over import game_over_screen
 from objectives import start_menu
 from objectives.explosion import Explosion
 import objectives.powerup as powerups_module
+import objectives.boss as boss_module
 
 # --------------------
 # SOUND INIT
@@ -33,16 +34,20 @@ sound.play_background_music()
 # --------------------
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Spaceship Game")
+pygame.display.set_caption("Spaceship Game - Levels & Bosses")
 clock = pygame.time.Clock()
 
 # --------------------
 # COLORS & FONT
 # --------------------
 BLACK = (0, 0, 0)
+RED = (255, 0, 0)
 WHITE = (255, 255, 255)
-CYAN = (0, 255, 255)
+GREEN = (0, 255, 0)
+YELLOW = (255, 255, 0)
+CYAN = (0, 255, 255)   # Added to fix NameError
 font = pygame.font.SysFont(None, 36)
+big_font = pygame.font.SysFont(None, 72)
 
 # --------------------
 # CONFIG VARIABLES
@@ -53,14 +58,14 @@ player_max_hp = 100
 damage_per_hit = 20
 base_invincible_duration = 1000
 
-enemy_width, enemy_height = 50, 40
-enemy_speed = 3
+# Enemy Defaults
+base_enemy_speed = 3
+spawn_rate = 40 
 
 # --------------------
 # GAME LISTS
 # --------------------
-# Bullets will now store: [Rectangle, Speed_X, Speed_Y]
-bullets = [] 
+bullets = []
 enemies = []
 explosions = []
 powerups = []
@@ -82,6 +87,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 player_img_path = os.path.join(BASE_DIR, "objectives", "images", "player_ship.png")
 enemy_img_path = os.path.join(BASE_DIR, "objectives", "images", "enemy_ship.png")
 
+# Load Images (Fallback logic)
 try:
     player_img = pygame.image.load(player_img_path).convert_alpha()
     player_img = pygame.transform.scale(player_img, (player_width, player_height))
@@ -91,9 +97,9 @@ except FileNotFoundError:
 
 try:
     enemy_img = pygame.image.load(enemy_img_path).convert_alpha()
-    enemy_img = pygame.transform.scale(enemy_img, (enemy_width, enemy_height))
+    enemy_img = pygame.transform.scale(enemy_img, (50, 40))
 except FileNotFoundError:
-    enemy_img = pygame.Surface((enemy_width, enemy_height))
+    enemy_img = pygame.Surface((50, 40))
     enemy_img.fill((255, 0, 0))
 
 # --------------------
@@ -106,12 +112,17 @@ player_lives = 0
 score = 0
 last_hit_time = 0
 
-# Buff Variables
+# Buffs
 rapid_fire_active = False
 rapid_fire_end_time = 0
 shield_active = False
 shield_end_time = 0
 shield_angle = 0
+
+# LEVEL SYSTEM VARIABLES
+level = 1
+next_level_score = 150
+current_boss = None  # Will hold the Boss object when active
 
 # --------------------
 # RESET GAME
@@ -121,6 +132,7 @@ def reset_game():
     global bullets, enemies, explosions, powerups
     global score, spawn_timer, last_hit_time, game_state
     global rapid_fire_active, shield_active, shield_angle
+    global level, next_level_score, current_boss, spawn_rate
 
     player_x = WIDTH // 2 - player_width // 2
     player_y = HEIGHT - 70
@@ -140,6 +152,12 @@ def reset_game():
     shield_active = False
     shield_angle = 0
 
+    # Reset Levels
+    level = 1
+    next_level_score = 150
+    current_boss = None
+    spawn_rate = 40
+
     sound.play_background_music()
     game_state = GAME_RUNNING
 
@@ -147,13 +165,11 @@ def reset_game():
 # DRAW PLAYER
 # --------------------
 def draw_player(x, y):
-    # Draw Shield
     if shield_active:
         center_x = x + player_width // 2
         center_y = y + player_height // 2
         radius = 40
         pygame.draw.circle(screen, (0, 100, 100), (center_x, center_y), radius, 1)
-
         # Rotating Orbs
         num_orbiters = 3
         for i in range(num_orbiters):
@@ -182,7 +198,30 @@ while running:
     clock.tick(60)
     current_time = pygame.time.get_ticks()
 
-    # EVENTS
+    # 1. LEVEL UP LOGIC
+    # Check if we reached score threshold AND we are not currently fighting a boss
+    if score >= next_level_score and current_boss is None:
+        
+        # Check if next level is a BOSS LEVEL (5, 10, 15, 20)
+        if (level + 1) in [5, 10, 15, 20]:
+            level += 1
+            # SPAWN BOSS - FIX: Passed both WIDTH and HEIGHT
+            current_boss = boss_module.Boss(WIDTH, HEIGHT)
+            
+            # BOSS HP - FIX: Ensures HP is never 0
+            current_boss.max_hp = 500 + (level * 100) 
+            current_boss.hp = current_boss.max_hp
+            
+            enemies.clear() # Clear small enemies
+        else:
+            # Normal Level Up
+            level += 1
+            next_level_score = level * 150
+            # Increase Difficulty
+            spawn_rate = max(10, 40 - level)
+            print(f"LEVEL UP! Welcome to Level {level}")
+
+    # 2. EVENTS
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -190,29 +229,16 @@ while running:
 
         if game_state == GAME_RUNNING and event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                # --- NEW SPRAY SHOOTING LOGIC ---
+                # SHOOTING
                 center_x = player_x + player_width // 2 - 3
-                
                 if rapid_fire_active:
-                    # Shoot 5 bullets in a Fan/Spray shape
-                    # Format: [Rectangle, Speed_X, Speed_Y]
-                    
-                    # 1. Straight Fast
+                    # Spray Shot
                     bullets.append([pygame.Rect(center_x, player_y, 6, 12), 0, -12])
-                    
-                    # 2. Slight Left
                     bullets.append([pygame.Rect(center_x, player_y, 6, 12), -3, -10])
-                    
-                    # 3. Slight Right
                     bullets.append([pygame.Rect(center_x, player_y, 6, 12), 3, -10])
-                    
-                    # 4. Hard Left (The Spray)
                     bullets.append([pygame.Rect(center_x, player_y, 6, 12), -6, -8])
-                    
-                    # 5. Hard Right (The Spray)
                     bullets.append([pygame.Rect(center_x, player_y, 6, 12), 6, -8])
                 else:
-                    # Normal Single Shot
                     bullets.append([pygame.Rect(center_x, player_y, 6, 12), 0, -8])
                 
                 sound.play_shoot()
@@ -249,40 +275,112 @@ while running:
     # DRAW BACKGROUND
     bg.draw(screen)
 
-    # --- NEW BULLET UPDATE LOGIC ---
-    # We iterate over a copy [:] so we can remove items safely
+    # UPDATE PLAYER BULLETS
     for b_data in bullets[:]:
-        rect = b_data[0]       # The Rectangle
-        speed_x = b_data[1]    # Horizontal Speed
-        speed_y = b_data[2]    # Vertical Speed
-        
-        rect.x += speed_x
-        rect.y += speed_y
-        
-        # Remove if off screen (Top, Left, or Right)
+        rect = b_data[0]
+        rect.x += b_data[1]
+        rect.y += b_data[2]
         if rect.y < 0 or rect.x < 0 or rect.x > WIDTH:
             bullets.remove(b_data)
 
-    # SPAWN ENEMIES
-    spawn_timer += 1
-    if spawn_timer > 40:
-        smarter_enemies.spawn_enemy(enemies, WIDTH, enemy_width, enemy_height)
-        spawn_timer = 0
-
-    # UPDATE ENEMIES
-    score = smarter_enemies.update_enemies(
-        enemies=enemies,
-        bullets=bullets,
-        enemy_speed=enemy_speed,
-        score=score,
-        sound=sound,
-        screen_height=HEIGHT,
-        explosions=explosions,
-        player_x=player_x,
-        player_y=player_y,
-        powerups_list=powerups
-    )
+    # ---------------------------
+    # SPAWN & UPDATE ENEMIES OR BOSS
+    # ---------------------------
     
+    # Only spawn normal enemies if NO BOSS is active
+    if current_boss is None:
+        spawn_timer += 1
+        if spawn_timer > spawn_rate: 
+            smarter_enemies.spawn_enemy(enemies, WIDTH, 50, 40)
+            spawn_timer = 0
+            
+        # Update Normal Enemies
+        current_enemy_speed = base_enemy_speed + (level * 0.2)
+        score = smarter_enemies.update_enemies(
+            enemies=enemies,
+            bullets=bullets,
+            enemy_speed=current_enemy_speed,
+            score=score,
+            sound=sound,
+            screen_height=HEIGHT,
+            explosions=explosions,
+            player_x=player_x,
+            player_y=player_y,
+            powerups_list=powerups
+        )
+    else:
+        # ==========================================
+        # BOSS FIGHT LOGIC
+        # ==========================================
+        
+        # 1. Update Boss Movement & Drawing
+        # NOTE: Removed WIDTH arg because your boss.py uses def update(self):
+        current_boss.update() 
+        current_boss.draw(screen)
+
+        # 2. Boss Shooting (Update & Draw Bullets)
+        current_boss.bullets.update()
+        current_boss.bullets.draw(screen)
+
+        # 3. Check collision: Boss Bullets vs Player
+        player_rect = pygame.Rect(player_x, player_y, player_width, player_height)
+        
+        for bullet in current_boss.bullets:
+            if player_rect.colliderect(bullet.rect):
+                bullet.kill() # Remove bullet
+                if not shield_active:
+                    # Only take damage if not invincible
+                    if current_time - last_hit_time > base_invincible_duration:
+                        player_hp -= 15
+                        last_hit_time = current_time
+                        sound.play_explosion()
+                        print("Hit by Boss Bullet!")
+
+        # 4. Check collision: Player Bullets vs Boss
+        for b_data in bullets[:]:
+            rect = b_data[0]
+            if rect.colliderect(current_boss.rect):
+                current_boss.hp -= 10 # Damage to boss
+                explosions.append(Explosion(rect.x, rect.y))
+                bullets.remove(b_data)
+                
+                # Check Boss Death
+                if current_boss.hp <= 0:
+                    score += 500 
+                    next_level_score = score + 150 
+                    sound.play_explosion()
+                    
+                    # Reward: Spawn Powerups
+                    try:
+                        powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx, current_boss.rect.centery)
+                        powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + 40, current_boss.rect.centery)
+                        powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx - 40, current_boss.rect.centery)
+                    except AttributeError:
+                        powerups.append(powerups_module.Powerup(current_boss.rect.centerx, current_boss.rect.centery, "life"))
+
+                    current_boss = None 
+                break
+        
+        # 5. Check collision: Player vs Boss Body
+        if current_boss and player_rect.colliderect(current_boss.rect):
+            if not shield_active:
+                if current_time - last_hit_time > base_invincible_duration:
+                     player_hp -= 30 
+                     last_hit_time = current_time
+                     sound.play_explosion()
+
+        # 6. Random Powerup Drop during Boss Fight (Help player)
+        if random.randint(1, 100) <= 2: # 2% chance per frame
+             drop_x = random.randint(50, WIDTH - 50)
+             # Manually creating powerup to add to list
+             try:
+                 # Pick random type
+                 p_type = random.choice([powerups_module.EXTRA_LIFE, powerups_module.RAPID_FIRE, powerups_module.SHIELD])
+                 new_p = powerups_module.PowerUp(drop_x, -50, p_type)
+                 powerups.append(new_p)
+             except Exception:
+                 pass
+
     # POWERUPS
     for p in powerups[:]:
         p.update()
@@ -299,24 +397,25 @@ while running:
                 shield_active = True
                 shield_end_time = current_time + 5000
             powerups.remove(p)
-        if p.rect.y > HEIGHT:
+        elif p.rect.y > HEIGHT:
             powerups.remove(p)
 
-    # COLLISION PLAYER
-    player_rect = pygame.Rect(player_x, player_y, player_width, player_height)
-    for enemy in enemies[:]:
-        if player_rect.colliderect(enemy):
-            if shield_active:
-                explosions.append(Explosion(enemy.x + enemy.width // 2, enemy.y + enemy.height // 2))
-                enemies.remove(enemy)
-                sound.play_explosion()
-            else:
-                if current_time - last_hit_time > base_invincible_duration:
-                    player_hp -= damage_per_hit
-                    last_hit_time = current_time
-                    explosions.append(Explosion(enemy.x + enemy.width // 2, enemy.y + enemy.height // 2))
+    # COLLISION PLAYER (Normal Enemies)
+    if current_boss is None:
+        player_rect = pygame.Rect(player_x, player_y, player_width, player_height)
+        for enemy in enemies[:]:
+            if player_rect.colliderect(enemy):
+                if shield_active:
+                    explosions.append(Explosion(enemy.x + 25, enemy.y + 20))
                     enemies.remove(enemy)
                     sound.play_explosion()
+                else:
+                    if current_time - last_hit_time > base_invincible_duration:
+                        player_hp -= damage_per_hit
+                        last_hit_time = current_time
+                        explosions.append(Explosion(enemy.x + 25, enemy.y + 20))
+                        enemies.remove(enemy)
+                        sound.play_explosion()
 
     # CHECK DEATH
     if player_hp <= 0:
@@ -329,6 +428,7 @@ while running:
             powerups.clear()
             rapid_fire_active = False
             shield_active = False
+            current_boss = None
             pygame.time.delay(800)
         else:
             sound.stop_background_music()
@@ -343,9 +443,9 @@ while running:
     else:
         draw_player(player_x, player_y)
 
-    # --- DRAW BULLETS ---
+    # DRAW BULLETS
     for b_data in bullets:
-        rect = b_data[0] # Get the rect from the list
+        rect = b_data[0]
         b_color = (255, 255, 0) if rapid_fire_active else WHITE
         pygame.draw.rect(screen, b_color, rect)
 
@@ -366,9 +466,19 @@ while running:
 
     score_text = font.render(f"Score: {score}", True, WHITE)
     screen.blit(score_text, (WIDTH - 150, 10))
+
+    # DISPLAY LEVEL
+    level_text = font.render(f"LEVEL {level}", True, CYAN)
+    screen.blit(level_text, (WIDTH // 2 - 50, 10))
     
+    # DISPLAY BOSS WARNING
+    if current_boss:
+        warn_text = big_font.render("BOSS FIGHT!", True, RED)
+        screen.blit(warn_text, (WIDTH // 2 - 140, HEIGHT // 2))
+
+    # BUFF TEXT
     if rapid_fire_active:
-        rf_text = font.render("RAPID FIRE!", True, (0, 255, 255))
+        rf_text = font.render("RAPID FIRE!", True, CYAN)
         screen.blit(rf_text, (WIDTH//2 - 60, HEIGHT - 40))
         
     if shield_active:

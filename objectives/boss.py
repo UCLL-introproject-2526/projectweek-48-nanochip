@@ -1,34 +1,44 @@
 import pygame
 import random
-from objectives.explosion import Explosion
 
-class Boss:
-    def __init__(self, x, y, width, height, hp, level):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.max_hp = hp
-        self.hp = hp
-        self.level = level
-        self.speed = 2
-        self.direction = 1  # left/right movement
-        self.shoot_timer = 0
-        self.shoot_cooldown = max(60 - level*2, 20)  # faster shooting at higher levels
+# 1. Define the Boss Bullet Class
+class BossBullet(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        # Create a simple red bullet (or load an image if you have one)
+        self.image = pygame.Surface((10, 20))
+        self.image.fill((255, 0, 0)) # Red color for enemy fire
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+        self.speed_y = 5  # Speed moving down
 
-    def update(self, enemy_bullets):
-        # Move left/right
-        self.rect.x += self.speed * self.direction
-        if self.rect.right > 800 or self.rect.left < 0:
-            self.direction *= -1
+    def update(self):
+        self.rect.y += self.speed_y
+        # Remove if it goes off screen
+        if self.rect.top > 800: # Assuming height is 600 or 800
+            self.kill()
 
-        # Shoot bullets
-        self.shoot_timer += 1
-        if self.shoot_timer >= self.shoot_cooldown:
-            bullet = pygame.Rect(self.rect.centerx - 5, self.rect.bottom, 10, 15)
-            enemy_bullets.append(bullet)
-            self.shoot_timer = 0
+# 2. Update your Boss Class
+class Boss(pygame.sprite.Sprite):
+    def __init__(self, screen_width, screen_height):
+        super().__init__()
+        # ... (keep your existing image loading code here) ...
+        
+        # Add these variables for shooting:
+        self.bullets = pygame.sprite.Group() # Group to hold boss bullets
+        self.last_shot_time = pygame.time.get_ticks()
+        self.shoot_delay = 1000  # Boss shoots every 1000ms (1 second)
 
-    def draw(self, surface):
-        pygame.draw.rect(surface, (200, 0, 200), self.rect)  # purple boss
-        # Draw HP bar
-        hp_ratio = self.hp / self.max_hp
-        pygame.draw.rect(surface, (255, 0, 0), (self.rect.x, self.rect.y - 10, self.rect.width, 5))
-        pygame.draw.rect(surface, (0, 255, 0), (self.rect.x, self.rect.y - 10, int(self.rect.width * hp_ratio), 5))
+    def update(self):
+        # ... (keep your existing movement code here) ...
+
+        # SHOOTING LOGIC
+        now = pygame.time.get_ticks()
+        if now - self.last_shot_time > self.shoot_delay:
+            self.shoot()
+            self.last_shot_time = now
+            
+    def shoot(self):
+        # Create a bullet at the boss's center
+        bullet = BossBullet(self.rect.centerx, self.rect.bottom)
+        self.bullets.add(bullet)
