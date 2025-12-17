@@ -76,11 +76,6 @@ spawn_timer = 0
 # --------------------
 GAME_RUNNING = "running"
 GAME_OVER = "over"
-<<<<<<< HEAD
-game_state = GAME_RUNNING
-
-# --------------------
-=======
 GAME_PAUSED = "paused"
 game_state = GAME_RUNNING
 
@@ -90,7 +85,6 @@ game_state = GAME_RUNNING
 screen_shake = 0
 
 # --------------------
->>>>>>> e294319a196ba2c65408b82653fa1d5f1da3b7fc
 # BACKGROUND & ASSETS
 # --------------------
 bg = Background("spaceship.jpg", WIDTH, HEIGHT)
@@ -264,8 +258,6 @@ while running:
             reset_game()
         continue
 
-<<<<<<< HEAD
-=======
     # 4. CALCULATE SHAKE OFFSET
     shake_x, shake_y = 0, 0
     if screen_shake > 0:
@@ -288,7 +280,6 @@ while running:
             spawn_rate = max(10, 40 - level)
             print(f"LEVEL UP! Welcome to Level {level}")
 
->>>>>>> e294319a196ba2c65408b82653fa1d5f1da3b7fc
     # TIMERS
     if rapid_fire_active and current_time > rapid_fire_end_time:
         rapid_fire_active = False
@@ -311,13 +302,8 @@ while running:
         player_x += current_speed
         if player_x > WIDTH: player_x = -player_width
 
-<<<<<<< HEAD
-    # DRAW BACKGROUND
-    bg.draw(screen)
-=======
     # DRAW BACKGROUND (Apply Shake)
     screen.blit(bg.image, (shake_x, shake_y))
->>>>>>> e294319a196ba2c65408b82653fa1d5f1da3b7fc
 
     # UPDATE PLAYER BULLETS
     for b_data in bullets[:]:
@@ -471,9 +457,6 @@ while running:
             powerups.clear()
             rapid_fire_active = False
             shield_active = False
-<<<<<<< HEAD
-            current_boss = None
-=======
             
             # --- FIX: Prevent Level Skip on Death during Boss Fight ---
             if current_boss:
@@ -485,7 +468,6 @@ while running:
                 current_boss = None
             
             screen_shake = 0
->>>>>>> e294319a196ba2c65408b82653fa1d5f1da3b7fc
             pygame.time.delay(800)
         else:
             sound.stop_background_music()
