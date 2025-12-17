@@ -76,9 +76,21 @@ spawn_timer = 0
 # --------------------
 GAME_RUNNING = "running"
 GAME_OVER = "over"
+<<<<<<< HEAD
 game_state = GAME_RUNNING
 
 # --------------------
+=======
+GAME_PAUSED = "paused"
+game_state = GAME_RUNNING
+
+# --------------------
+# SHAKE EFFECT
+# --------------------
+screen_shake = 0
+
+# --------------------
+>>>>>>> e294319a196ba2c65408b82653fa1d5f1da3b7fc
 # BACKGROUND & ASSETS
 # --------------------
 bg = Background("spaceship.jpg", WIDTH, HEIGHT)
@@ -252,6 +264,31 @@ while running:
             reset_game()
         continue
 
+<<<<<<< HEAD
+=======
+    # 4. CALCULATE SHAKE OFFSET
+    shake_x, shake_y = 0, 0
+    if screen_shake > 0:
+        screen_shake -= 1
+        shake_x = random.randint(-5, 5)
+        shake_y = random.randint(-5, 5)
+
+    # 5. LEVEL UP LOGIC
+    if score >= next_level_score and current_boss is None:
+        if (level + 1) in [5, 10, 15, 20]:
+            level += 1
+            # SPAWN BOSS
+            current_boss = boss_module.Boss(WIDTH, HEIGHT)
+            current_boss.max_hp = 500 + (level * 100) 
+            current_boss.hp = current_boss.max_hp
+            enemies.clear() 
+        else:
+            level += 1
+            next_level_score = level * 150
+            spawn_rate = max(10, 40 - level)
+            print(f"LEVEL UP! Welcome to Level {level}")
+
+>>>>>>> e294319a196ba2c65408b82653fa1d5f1da3b7fc
     # TIMERS
     if rapid_fire_active and current_time > rapid_fire_end_time:
         rapid_fire_active = False
@@ -274,8 +311,13 @@ while running:
         player_x += current_speed
         if player_x > WIDTH: player_x = -player_width
 
+<<<<<<< HEAD
     # DRAW BACKGROUND
     bg.draw(screen)
+=======
+    # DRAW BACKGROUND (Apply Shake)
+    screen.blit(bg.image, (shake_x, shake_y))
+>>>>>>> e294319a196ba2c65408b82653fa1d5f1da3b7fc
 
     # UPDATE PLAYER BULLETS
     for b_data in bullets[:]:
@@ -418,7 +460,7 @@ while running:
                         enemies.remove(enemy)
                         sound.play_explosion()
 
-    # CHECK DEATH
+    # CHECK DEATH AND RESPAWN
     if player_hp <= 0:
         player_lives -= 1
         if player_lives > 0:
@@ -429,7 +471,21 @@ while running:
             powerups.clear()
             rapid_fire_active = False
             shield_active = False
+<<<<<<< HEAD
             current_boss = None
+=======
+            
+            # --- FIX: Prevent Level Skip on Death during Boss Fight ---
+            if current_boss:
+                # If there is a boss, keep it active and reset its position
+                current_boss.rect.centerx = WIDTH // 2
+                current_boss.rect.y = 50
+            else:
+                # Only clear boss variable if we aren't fighting one
+                current_boss = None
+            
+            screen_shake = 0
+>>>>>>> e294319a196ba2c65408b82653fa1d5f1da3b7fc
             pygame.time.delay(800)
         else:
             sound.stop_background_music()
