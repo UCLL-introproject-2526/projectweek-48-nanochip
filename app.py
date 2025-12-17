@@ -1,10 +1,14 @@
-# Simple Spaceship Game using Pygame
-# Run with: python app.py
-
-import sys
 import pygame
+import sys
 import random
-from random import choices
+import os
+import math
+
+# --------------------
+# INIT
+# --------------------
+pygame.init()
+pygame.mixer.init()
 
 # --------------------
 # IMPORT MODULES
@@ -12,17 +16,24 @@ from random import choices
 from objectives import sound
 from objectives.background import Background
 from objectives import health
-from objectives import Smarter_enemies
-
+import objectives.Smarter_enemies as smarter_enemies
+from objectives.game_over import game_over_screen
+from objectives import start_menu
+from objectives.explosion import Explosion
+import objectives.powerup as powerups_module
+import objectives.boss as boss_module
 
 # --------------------
-# INIT
+# SOUND INIT
 # --------------------
+sound.init_sound()
+sound.play_background_music()
 
-pygame.init()
+# --------------------
+# DISPLAY
+# --------------------
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-<<<<<<< HEAD
 pygame.display.set_caption("Spaceship Game - Sector 48")
 clock = pygame.time.Clock()
 
@@ -75,40 +86,37 @@ screen_shake = 0 # Timer for shake
 
 # --------------------
 # BACKGROUND & ASSETS
-=======
-pygame.display.set_caption("Spaceship Game")
-clock = pygame.time.Clock()
-
-# --------------------
-# BACKGROUND
->>>>>>> 947139c5ed2e445cf7493e1851e3bc0e394125c5
 # --------------------
 bg = Background("spaceship.jpg", WIDTH, HEIGHT)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+player_img_path = os.path.join(BASE_DIR, "objectives", "images", "player_ship.png")
+enemy_img_path = os.path.join(BASE_DIR, "objectives", "images", "enemy_ship.png")
+
+# Load Images (Fallback logic)
+try:
+    player_img = pygame.image.load(player_img_path).convert_alpha()
+    player_img = pygame.transform.scale(player_img, (player_width, player_height))
+except FileNotFoundError:
+    player_img = pygame.Surface((player_width, player_height))
+    player_img.fill((0, 255, 0))
+
+try:
+    enemy_img = pygame.image.load(enemy_img_path).convert_alpha()
+    enemy_img = pygame.transform.scale(enemy_img, (50, 40))
+except FileNotFoundError:
+    enemy_img = pygame.Surface((50, 40))
+    enemy_img.fill((255, 0, 0))
 
 # --------------------
-# COLORS
+# VARIABLES
 # --------------------
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-
-# --------------------
-# PLAYER
-# --------------------
-player_width, player_height = 50, 40
-player_x = WIDTH // 2 - player_width // 2
-player_y = HEIGHT - 70
-player_speed = 6
-
-# --------------------
-# PLAYER HEALTH & LIVES
-# --------------------
-player_max_hp = 100
-player_hp = 100
-player_lives = 3
-
+player_x = 0
+player_y = 0
+player_hp = 0
+player_lives = 0
+score = 0
 last_hit_time = 0
-<<<<<<< HEAD
 
 # Buffs
 rapid_fire_active = False
@@ -121,15 +129,10 @@ shield_angle = 0
 level = 1
 next_level_score = 150
 current_boss = None
-=======
-invincible_duration = 1000  # ms
-damage_per_hit = 20
->>>>>>> 947139c5ed2e445cf7493e1851e3bc0e394125c5
 
 # --------------------
-# BULLETS
+# RESET GAME
 # --------------------
-<<<<<<< HEAD
 def reset_game():
     global player_x, player_y, player_hp, player_lives
     global bullets, enemies, explosions, powerups
@@ -164,64 +167,53 @@ def reset_game():
 
     sound.play_background_music()
     game_state = GAME_RUNNING
-=======
-bullets = []
-bullet_speed = 8
->>>>>>> 947139c5ed2e445cf7493e1851e3bc0e394125c5
 
 # --------------------
-# ENEMIES
-# --------------------
-enemies = []
-enemy_speed = 3
-# spawn_timer = 0
-
-# --------------------
-# SCORE
-# --------------------
-score = 0
-font = pygame.font.SysFont(None, 36)
-
-# --------------------
-# DRAW FUNCTIONS
+# DRAW PLAYER
 # --------------------
 def draw_player(x, y):
-    pygame.draw.polygon(
-        screen,
-        WHITE,
-        [
-            (x, y + player_height),
-            (x + player_width // 2, y),
-            (x + player_width, y + player_height),
-        ],
-    )
+    if shield_active:
+        center_x = x + player_width // 2
+        center_y = y + player_height // 2
+        radius = 40
+        pygame.draw.circle(screen, (0, 100, 100), (center_x, center_y), radius, 1)
+        # Rotating Orbs
+        num_orbiters = 3
+        for i in range(num_orbiters):
+            offset = (360 / num_orbiters) * i
+            rad_angle = math.radians(shield_angle + offset)
+            orb_x = center_x + math.cos(rad_angle) * radius
+            orb_y = center_y + math.sin(rad_angle) * radius
+            pygame.draw.circle(screen, WHITE, (int(orb_x), int(orb_y)), 4)
+            pygame.draw.circle(screen, CYAN, (int(orb_x), int(orb_y)), 2)
 
-def draw_score():
-    text = font.render(f"Score: {score}", True, WHITE)
-    screen.blit(text, (10, 10))
-# --------------------
-# GAME LOOP
-# --------------------
+    screen.blit(player_img, (x, y))
 
+# --------------------
+# START MENU
+# --------------------
+action = start_menu.start_menu(screen, clock)
+if action == "start":
+    reset_game()
+elif action == "quit":
+    pygame.quit()
+    sys.exit()
+
+# --------------------
+# MAIN LOOP
+# --------------------
 running = True
 while running:
     clock.tick(60)
-<<<<<<< HEAD
     current_time = pygame.time.get_ticks()
 
     # 1. EVENTS (Includes Pause Toggle)
-=======
-    
-    # --------------------
-    # EVENTS
-    # --------------------
->>>>>>> 947139c5ed2e445cf7493e1851e3bc0e394125c5
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            running = False
+            pygame.quit()
+            sys.exit()
 
         if event.type == pygame.KEYDOWN:
-<<<<<<< HEAD
             # PAUSE TOGGLE
             if event.key == pygame.K_p:
                 if game_state == GAME_RUNNING:
@@ -292,43 +284,28 @@ while running:
             if shield_angle >= 360: shield_angle -= 360
 
     # MOVEMENT
-=======
-            if event.key == pygame.K_SPACE:
-                bullets.append(pygame.Rect(player_x + player_width // 2 - 3,player_y,6,12,))
-                sound.play_shoot()
-           # if event.type == randomize_dodging:
-           # randomize_dodging()
-    # --------------------
-    # INPUT
-    # --------------------
->>>>>>> 947139c5ed2e445cf7493e1851e3bc0e394125c5
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_LEFT] and player_x > 0:
-        player_x -= player_speed
-    if keys[pygame.K_RIGHT] and player_x < WIDTH - player_width:
-        player_x += player_speed
+    current_speed = player_speed + 2 if rapid_fire_active else player_speed
+    
+    if keys[pygame.K_LEFT]:
+        player_x -= current_speed
+        if player_x + player_width < 0: player_x = WIDTH
+    if keys[pygame.K_RIGHT]:
+        player_x += current_speed
+        if player_x > WIDTH: player_x = -player_width
 
-<<<<<<< HEAD
     # DRAW BACKGROUND (Apply Shake)
     # We access the image directly to apply the offset
     screen.blit(bg.image, (shake_x, shake_y))
-=======
-    # --------------------
-    # DRAW BACKGROUND
-    # --------------------
-    bg.draw(screen)
->>>>>>> 947139c5ed2e445cf7493e1851e3bc0e394125c5
 
-    # --------------------
-    # BULLET UPDATE
-    # --------------------
-    spawn_timer =0
-    for bullet in bullets[:]:
-        bullet.y -= bullet_speed
-        if bullet.y < 0:
-            bullets.remove(bullet)
+    # UPDATE PLAYER BULLETS
+    for b_data in bullets[:]:
+        rect = b_data[0]
+        rect.x += b_data[1]
+        rect.y += b_data[2]
+        if rect.y < 0 or rect.x < 0 or rect.x > WIDTH:
+            bullets.remove(b_data)
 
-<<<<<<< HEAD
     # ---------------------------
     # SPAWN & UPDATE ENEMIES OR BOSS
     # ---------------------------
@@ -451,60 +428,12 @@ while running:
                         sound.play_explosion()
 
     # CHECK DEATH
-=======
-    # --------------------
-    # ENEMY SPAWN
-    # --------------------
-    spawn_timer += 1
-    if spawn_timer > 40:
-        enemies.append(pygame.Rect(random.randint(0,WIDTH -40), -40, 40, 30))      
-        # Smarter_enemies.spawn_enemy(enemies, WIDTH)
-        spawn_timer = 0
-        if score > 3:
-            spawn_timer = 20
-            enemies.append(pygame.Rect(random.randint(0, WIDTH - 40), -40, 40, 30))
-            spawn_timer = 0 
-    # --------------------
-    # ENEMY UPDATE (SMART AI)
-    # --------------------
-    score = Smarter_enemies.update_enemies(
-        enemies=enemies,
-        bullets=bullets,
-        enemy_speed=enemy_speed,
-        score=score,
-        sound=sound,
-        screen_height=HEIGHT,
-    )
-
-    # --------------------
-    # PLAYER VS ENEMY COLLISION
-    # --------------------
-    player_rect = pygame.Rect(
-        player_x, player_y, player_width, player_height
-    )
-    current_time = pygame.time.get_ticks()
-
-    for enemy in enemies[:]:
-        if player_rect.colliderect(enemy):
-            if current_time - last_hit_time > invincible_duration:
-                player_hp -= damage_per_hit
-                last_hit_time = current_time
-                enemies.remove(enemy)
-
-    # --------------------
-    # DEATH & RESPAWN
-    # --------------------
->>>>>>> 947139c5ed2e445cf7493e1851e3bc0e394125c5
     if player_hp <= 0:
         player_lives -= 1
-
         if player_lives > 0:
             player_hp = player_max_hp
-            player_x = WIDTH // 2 - player_width // 2
-            player_y = HEIGHT - 70
             enemies.clear()
             bullets.clear()
-<<<<<<< HEAD
             explosions.clear()
             powerups.clear()
             rapid_fire_active = False
@@ -512,29 +441,19 @@ while running:
             current_boss = None
             screen_shake = 0
             pygame.time.delay(800)
-=======
-            pygame.time.delay(1000)
->>>>>>> 947139c5ed2e445cf7493e1851e3bc0e394125c5
         else:
-            print("GAME OVER")
-            running = False
+            sound.stop_background_music()
+            sound.play_game_over()
+            game_state = GAME_OVER
 
-<<<<<<< HEAD
     # DRAW PLAYER (With Shake)
     is_hit_invincible = (current_time - last_hit_time < base_invincible_duration)
     if is_hit_invincible and not shield_active:
-=======
-    # --------------------
-    # DRAW PLAYER (INVINCIBILITY FLASH)
-    # --------------------
-    if current_time - last_hit_time < invincible_duration:
->>>>>>> 947139c5ed2e445cf7493e1851e3bc0e394125c5
         if (current_time // 100) % 2 == 0:
             draw_player(player_x + shake_x, player_y + shake_y)
     else:
         draw_player(player_x + shake_x, player_y + shake_y)
 
-<<<<<<< HEAD
     # DRAW BULLETS
     for b_data in bullets:
         rect = b_data[0]
@@ -546,59 +465,21 @@ while running:
     # DRAW ENEMIES (With Shake)
     for enemy in enemies:
         screen.blit(enemy_img, (enemy.x + shake_x, enemy.y + shake_y))
-=======
-    # --------------------
-    # DRAW BULLETS & ENEMIES
-    # --------------------
-    for bullet in bullets[:]:
-        #     def randomize_dodging():
-        #     randomize_dodging = pygame.USEREVENT + 0
-        #     pygame.time.set_timer(randomize_dodging, 5000)
-            bullet_is_threatening = False
-            dodge_to_right = enemy.x + 10
-            dodge_to_left = enemy.x - 10
-            danger_width = enemy.width
-            if abs(bullet.x - enemy.x) < danger_width:
 
-                # bullet_is_threatening = True
-            # if abs(bullet.centerx-enemy.centerx)< danger_width and bullet.y < enemy.y:
-                bullet_is_threatening = True 
-            if bullet_is_threatening ==True:
-                if dodges > 0:
-                    choice = choices ([dodge_to_right, dodge_to_left], [0.5, 0.5])[0] 
-                    enemy.x = choice 
-                dodges = dodges - 1
-            # randomize_dodging()
-            if enemy.colliderect(bullet):
-                enemies.remove(enemy)
-                bullets.remove(bullet)
-                score += 1
-                break
-        # pygame.draw.rect(screen, WHITE, bullet)
-    for enemy in enemies[:]:
-        dodges = 1
-        enemy.y += enemy_speed
-        if enemy.y > HEIGHT:
-            enemies.remove(enemy)      
-        pygame.draw.rect(screen, RED, enemy)
->>>>>>> 947139c5ed2e445cf7493e1851e3bc0e394125c5
+    # DRAW EXPLOSIONS
+    for exp in explosions[:]:
+        exp.update()
+        exp.draw(screen)
+        if exp.is_dead():
+            explosions.remove(exp)
 
-    # --------------------
-    # UI (HEALTH, LIVES, SCORE)
-    # --------------------
-    health.draw_health_bar(
-        screen, 10, 10, player_hp, player_max_hp
-    )
-    health.draw_lives(
-        screen, 10, 40, player_lives, font
-    )
+    # UI
+    health.draw_health_bar(screen, 10, 10, player_hp, player_max_hp)
+    health.draw_lives(screen, 10, 40, player_lives, font)
 
-    score_text = font.render(
-        f"Score: {score}", True, WHITE
-    )
+    score_text = font.render(f"Score: {score}", True, WHITE)
     screen.blit(score_text, (WIDTH - 150, 10))
 
-<<<<<<< HEAD
     level_text = font.render(f"LEVEL {level}", True, CYAN)
     screen.blit(level_text, (WIDTH // 2 - 50, 10))
     
@@ -615,8 +496,6 @@ while running:
         y_pos = HEIGHT - 70 if rapid_fire_active else HEIGHT - 40
         screen.blit(sh_text, (WIDTH//2 - 60, y_pos))
 
-=======
->>>>>>> 947139c5ed2e445cf7493e1851e3bc0e394125c5
     pygame.display.flip()
 
 pygame.quit()
