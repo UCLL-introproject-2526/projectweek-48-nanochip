@@ -21,23 +21,14 @@ def start_menu(screen, clock):
     option_font = pygame.font.SysFont("Arial", 40)
     small_font = pygame.font.SysFont("Arial", 24)
 
-    # ----------------------------------------------------
-    # 1. LOAD BACKGROUND IMAGE
-    # ----------------------------------------------------
+    # 1. LOAD BACKGROUND
     bg_image = None
     try:
-        # Get path to objectives/images/
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # CHANGE "menu_bg.jpg" TO YOUR FILENAME (e.g. "spaceship.jpg")
         img_path = os.path.join(base_dir, "images", "menu_bg.png") 
-        
         if os.path.exists(img_path):
             loaded_img = pygame.image.load(img_path).convert()
-            # Scale it to fit the screen window
             bg_image = pygame.transform.scale(loaded_img, screen.get_size())
-        else:
-            print(f"Menu background not found at: {img_path}")
     except Exception as e:
         print(f"Error loading menu background: {e}")
 
@@ -47,28 +38,22 @@ def start_menu(screen, clock):
     in_settings = False 
 
     while True:
-        # ----------------------------------------------------
         # 2. DRAW BACKGROUND
-        # ----------------------------------------------------
         if bg_image:
-            screen.blit(bg_image, (0, 0)) # Draw image
-            # Optional: Draw a semi-transparent black overlay so text is readable
+            screen.blit(bg_image, (0, 0)) 
+            # Dark overlay for readability
             overlay = pygame.Surface(screen.get_size())
-            overlay.set_alpha(150) # 0 is transparent, 255 is solid
+            overlay.set_alpha(100) 
             overlay.fill((0, 0, 0))
             screen.blit(overlay, (0,0))
         else:
-            screen.fill(BLACK) # Fallback if no image
+            screen.fill(BLACK) 
 
-        # ----------------------
-        # DRAW TITLE
-        # ----------------------
-        draw_text_centered(screen, "SECTOR 48", small_font, NEON_BLUE, 100)
-        draw_text_centered(screen, "NANOCHIP", title_font, WHITE, 150)
+        # 3. DRAW TITLE
+        # draw_text_centered(screen, "SECTOR 48", small_font, NEON_BLUE, 100)
+        # REMOVED: "NANOCHIP" white text to show background logo instead
 
-        # ----------------------
-        # DRAW MENU OPTIONS
-        # ----------------------
+        # 4. DRAW OPTIONS
         if not in_settings:
             for i, option in enumerate(menu_options):
                 if i == selected_index:
@@ -91,9 +76,7 @@ def start_menu(screen, clock):
 
         pygame.display.flip()
 
-        # ----------------------
-        # INPUT HANDLING
-        # ----------------------
+        # 5. INPUTS
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
