@@ -15,7 +15,7 @@ pygame.mixer.init()
 from objectives import sound
 from objectives.background import Background
 from objectives import health
-import objectives.smarter_enemies as smarter_enemies
+import objectives.Smarter_enemies as smarter_enemies
 from objectives.game_over import game_over_screen
 from objectives import start_menu
 from objectives.explosion import Explosion
