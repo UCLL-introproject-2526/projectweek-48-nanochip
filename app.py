@@ -76,13 +76,13 @@ spawn_timer = 0
 # --------------------
 GAME_RUNNING = "running"
 GAME_OVER = "over"
-GAME_PAUSED = "paused" # <--- NEW STATE
+GAME_PAUSED = "paused"
 game_state = GAME_RUNNING
 
 # --------------------
 # SHAKE EFFECT
 # --------------------
-screen_shake = 0 # Timer for shake
+screen_shake = 0
 
 # --------------------
 # BACKGROUND & ASSETS
@@ -261,7 +261,7 @@ while running:
     if score >= next_level_score and current_boss is None:
         if (level + 1) in [5, 10, 15, 20]:
             level += 1
-            # SPAWN BOSS (Pass both WIDTH and HEIGHT)
+            # SPAWN BOSS
             current_boss = boss_module.Boss(WIDTH, HEIGHT)
             current_boss.max_hp = 500 + (level * 100) 
             current_boss.hp = current_boss.max_hp
@@ -295,7 +295,6 @@ while running:
         if player_x > WIDTH: player_x = -player_width
 
     # DRAW BACKGROUND (Apply Shake)
-    # We access the image directly to apply the offset
     screen.blit(bg.image, (shake_x, shake_y))
 
     # UPDATE PLAYER BULLETS
@@ -427,7 +426,7 @@ while running:
                         enemies.remove(enemy)
                         sound.play_explosion()
 
-    # CHECK DEATH
+    # CHECK DEATH AND RESPAWN
     if player_hp <= 0:
         player_lives -= 1
         if player_lives > 0:
@@ -438,7 +437,16 @@ while running:
             powerups.clear()
             rapid_fire_active = False
             shield_active = False
-            current_boss = None
+            
+            # --- FIX: Prevent Level Skip on Death during Boss Fight ---
+            if current_boss:
+                # If there is a boss, keep it active and reset its position
+                current_boss.rect.centerx = WIDTH // 2
+                current_boss.rect.y = 50
+            else:
+                # Only clear boss variable if we aren't fighting one
+                current_boss = None
+            
             screen_shake = 0
             pygame.time.delay(800)
         else:
