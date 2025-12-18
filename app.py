@@ -201,11 +201,7 @@ def reset_game():
     next_level_score = 150
     current_boss = None
     spawn_rate = 40
-<<<<<<< HEAD
-    
-=======
    
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
     # Reset Boss Intro vars
     boss_intro = False
     boss_intro_start = 0
