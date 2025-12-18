@@ -27,7 +27,7 @@ import objectives.boss as boss_module
 # SOUND INIT
 # --------------------
 sound.init_sound()
-sound.play_background_music()
+
 
 # --------------------
 # DISPLAY
@@ -36,6 +36,8 @@ WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Spaceship Game - Sector 48")
 clock = pygame.time.Clock()
+# remember last known windowed size so ESC can restore/center
+last_windowed_size = (WIDTH, HEIGHT)
 
 # --------------------
 # COLORS & FONT
@@ -112,28 +114,14 @@ game_state = GAME_RUNNING
 screen_shake = 0
 
 # --------------------
-# BACKGROUND & ASSETS
+# BACKGROUND & ASSETS (deferred load to speed startup)
 # --------------------
-bg = Background("spaceship.jpg", WIDTH, HEIGHT)
+bg = None
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
+player_img = None
+enemy_img = None
 player_img_path = os.path.join(BASE_DIR, "objectives", "images", "player_ship.png")
 enemy_img_path = os.path.join(BASE_DIR, "objectives", "images", "enemy_ship.png")
-
-# Load Images (Fallback logic)
-try:
-    player_img = pygame.image.load(player_img_path).convert_alpha()
-    player_img = pygame.transform.scale(player_img, (player_width, player_height))
-except FileNotFoundError:
-    player_img = pygame.Surface((player_width, player_height))
-    player_img.fill((0, 255, 0))
-
-try:
-    enemy_img = pygame.image.load(enemy_img_path).convert_alpha()
-    enemy_img = pygame.transform.scale(enemy_img, (50, 40))
-except FileNotFoundError:
-    enemy_img = pygame.Surface((50, 40))
-    enemy_img.fill((255, 0, 0))
 
 # --------------------
 # VARIABLES
@@ -167,7 +155,7 @@ boss_bar_height = 80
 # RESET GAME
 # --------------------
 def reset_game():
-    global player_x, player_y, player_hp, player_lives0
+    global player_x, player_y, player_hp, player_lives
     global bullets, enemies, explosions, powerups
     global score, spawn_timer, last_hit_time, game_state
     global rapid_fire_active, shield_active, shield_angle
@@ -201,11 +189,6 @@ def reset_game():
     next_level_score = 150
     current_boss = None
     spawn_rate = 40
-<<<<<<< HEAD
-    
-=======
-   
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
     # Reset Boss Intro vars
     boss_intro = False
     boss_intro_start = 0
@@ -238,7 +221,59 @@ def draw_player(x, y):
 # --------------------
 # START MENU
 # --------------------
-action = start_menu.start_menu(screen, clock)
+# start_menu may change display mode (fullscreen). it returns (action, is_fullscreen)
+res = start_menu.start_menu(screen, clock)
+if isinstance(res, tuple) and len(res) == 2:
+    action, is_fullscreen = res
+else:
+    action = res
+    is_fullscreen = False
+
+# refresh display surface and sizes in case mode changed in menu
+screen = pygame.display.get_surface()
+WIDTH, HEIGHT = screen.get_size()
+last_windowed_size = (WIDTH, HEIGHT)
+
+# compute scale factor from original design (800x600)
+scale_x = WIDTH / 800.0
+scale_y = HEIGHT / 600.0
+
+# scale player/enemy sizes to fit the new window
+player_width = max(16, int(50 * scale_x))
+player_height = max(12, int(40 * scale_y))
+
+# Load images now if they were deferred
+try:
+    if player_img is None:
+        try:
+            player_img = pygame.image.load(player_img_path).convert_alpha()
+        except Exception:
+            player_img = pygame.Surface((player_width, player_height))
+            player_img.fill((0, 255, 0))
+    if enemy_img is None:
+        try:
+            enemy_img = pygame.image.load(enemy_img_path).convert_alpha()
+        except Exception:
+            enemy_img = pygame.Surface((50, 40))
+            enemy_img.fill((255, 0, 0))
+except Exception:
+    pass
+
+try:
+    # rescale player image to new size
+    player_img = pygame.transform.scale(player_img, (player_width, player_height))
+except Exception:
+    pass
+try:
+    enemy_w = max(16, int(50 * scale_x))
+    enemy_h = max(12, int(40 * scale_y))
+    enemy_img = pygame.transform.scale(enemy_img, (enemy_w, enemy_h))
+except Exception:
+    pass
+
+# recreate background to match new size
+bg = Background("spaceship.jpg", WIDTH, HEIGHT)
+
 if action == "start":
     reset_game()
 elif action == "quit":
@@ -260,6 +295,34 @@ while running:
             sys.exit()
 
         if event.type == pygame.KEYDOWN:
+            # ESC should restore or center window (mid-screen)
+            if event.key == pygame.K_ESCAPE:
+                try:
+                    info = pygame.display.Info()
+                    surf = pygame.display.get_surface()
+                    flags = surf.get_flags()
+                    # if fullscreen -> restore to last windowed size, else keep current
+                    if flags & pygame.FULLSCREEN:
+                        win_w, win_h = last_windowed_size
+                    else:
+                        win_w, win_h = surf.get_size()
+
+                    pos_x = max(0, (info.current_w - win_w) // 2)
+                    pos_y = max(0, (info.current_h - win_h) // 2)
+                    os.environ['SDL_VIDEO_WINDOW_POS'] = f"{pos_x},{pos_y}"
+                    pygame.display.set_mode((win_w, win_h))
+                    # refresh surfaces and sizes
+                    screen = pygame.display.get_surface()
+                    WIDTH, HEIGHT = screen.get_size()
+                    # update last windowed size
+                    last_windowed_size = (WIDTH, HEIGHT)
+                    try:
+                        bg = Background("spaceship.jpg", WIDTH, HEIGHT)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+                continue
             # PAUSE TOGGLE
             if event.key == pygame.K_p:
                 if game_state == GAME_RUNNING:
@@ -311,14 +374,13 @@ while running:
 
     # 5. LEVEL UP LOGIC
     if score >= next_level_score and current_boss is None:
+        # If the next level is a boss level, prepare and spawn a boss
         if (level + 1) in [5, 10, 15, 20]:
             level += 1
-            # SPAWN BOSS
-            # Determine variant image for special bosses
             variant_name = None
             alt_img_path = None
 
-            # Level 5: first boss
+            # Try selected images for Level 5
             if level == 5:
                 for name in ("alien_bosss.png", "alien_boss.png"):
                     path = os.path.join(BASE_DIR, "objectives", "images", name)
@@ -327,17 +389,8 @@ while running:
                         alt_img_path = path
                         break
 
-<<<<<<< HEAD
-            # Level 10: second boss
-=======
-<<<<<<< HEAD
-            # Level 10: second boss
-=======
-            # Level 10: second boss - prefer demon_boss.png first, then custom rewop images, then alien_boss2.png
->>>>>>> 3b8984005f7f2116d654f6572d65717acd122968
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
+            # Level 10 prefers a demon boss image or a custom variant
             if level == 10:
-                # Prefer a specific demon boss image if present
                 demon_path = os.path.join(BASE_DIR, "objectives", "images", "demon_boss.png")
                 if os.path.exists(demon_path):
                     variant_name = "demon_boss"
@@ -354,87 +407,55 @@ while running:
             current_boss.max_hp = 500 + (level * 100)
             current_boss.hp = current_boss.max_hp
 
-            # Tone down Level 10 difficulty moderately
+            # Adjust Level 10 difficulty mildly
             if level == 10:
-                # Moderate HP bump (smaller than before)
                 current_boss.max_hp += 200
                 current_boss.hp = current_boss.max_hp
-                # Slightly increase speed (was +2, now +1)
                 current_boss.speed_x = abs(current_boss.speed_x) + 1
-                # Make shooting less aggressive (longer shoot delay than before)
                 current_boss.shoot_delay = min(getattr(current_boss, 'shoot_delay', 1000) + 150, 800)
-                # Keep hard behavior flag enabled but boss is nerfed
                 setattr(current_boss, 'hard_behavior', True)
 
-            # Make the first boss a bit tougher: slightly more HP, faster movement and quicker shots
+            # Make Level 5 boss a bit tougher when no variant image provided
             if level == 5 and variant_name is None:
                 current_boss.max_hp += 150
                 current_boss.hp = current_boss.max_hp
-                # Increase horizontal speed slightly (more aggressive movement)
                 current_boss.speed_x = abs(current_boss.speed_x) + 1
-                # Lower shoot delay so boss fires a bit more often (ms)
                 current_boss.shoot_delay = max(350, current_boss.shoot_delay - 300)
-                # Set a slightly lower settling position so the boss sits a bit down
                 current_boss.target_y = BOSS_TARGET_Y + 12
 
-<<<<<<< HEAD
-            # Apply variant image if found
-=======
-<<<<<<< HEAD
-            # Apply variant image if found
-=======
-            # Keep both the first and second bosses at a similar, slightly larger size
-            # (fixes the earlier disproportionate second-boss scaling)
+            # Size tweaks for boss presentation
             if level in (5, 10):
-                # Level 5: slightly larger than default
                 if level == 5:
                     current_boss.width = 120
                     current_boss.height = 96
                     current_boss.target_y = getattr(current_boss, 'target_y', BOSS_TARGET_Y + 12)
                 else:
-                    # Level 10: a bit bigger than Level 5
                     current_boss.width = 140
                     current_boss.height = 112
                     current_boss.target_y = BOSS_TARGET_Y + 20
-            # Boss variant: use a different image if one was found
->>>>>>> 3b8984005f7f2116d654f6572d65717acd122968
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
+
+            # Load or tint variant image if present
             try:
                 if alt_img_path:
                     loaded_img = pygame.image.load(alt_img_path).convert_alpha()
                     current_boss.image = pygame.transform.scale(loaded_img, (current_boss.width, current_boss.height))
-                    # Preserve center position
                     cx = current_boss.rect.centerx
                     cy = current_boss.rect.centery
                     current_boss.rect = current_boss.image.get_rect()
                     current_boss.rect.centerx = cx
                     current_boss.rect.centery = cy
                 else:
-<<<<<<< HEAD
-                    # Fallback tint
-=======
-<<<<<<< HEAD
-                    # Fallback tint
-=======
-                    # Fallback: scale and tint the default boss image to make it look different
->>>>>>> 3b8984005f7f2116d654f6572d65717acd122968
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
-                    try:
-                        scaled = pygame.transform.scale(current_boss.image.copy(), (current_boss.width, current_boss.height))
-                        scaled.fill((0, 100, 180, 0), special_flags=pygame.BLEND_RGBA_MULT)
-                        current_boss.image = scaled
-                        # Preserve center position
-                        cx = current_boss.rect.centerx
-                        cy = current_boss.rect.centery
-                        current_boss.rect = current_boss.image.get_rect()
-                        current_boss.rect.centerx = cx
-                        current_boss.rect.centery = cy
-                    except Exception:
-                        pass
+                    scaled = pygame.transform.scale(current_boss.image.copy(), (current_boss.width, current_boss.height))
+                    scaled.fill((0, 100, 180, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                    current_boss.image = scaled
+                    cx = current_boss.rect.centerx
+                    cy = current_boss.rect.centery
+                    current_boss.rect = current_boss.image.get_rect()
+                    current_boss.rect.centerx = cx
+                    current_boss.rect.centery = cy
             except Exception as e:
                 print(f"Warning: Could not set boss variant image: {e}")
 
-            # Cinematic intro setup
             boss_intro = True
             boss_intro_start = pygame.time.get_ticks()
             current_boss.rect.y = -current_boss.rect.height
@@ -540,11 +561,7 @@ while running:
 
             if elapsed >= boss_intro_duration:
                 boss_intro = False
-<<<<<<< HEAD
-                screen_shake = 6 
-=======
                 screen_shake = 6
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
                 sound.play_background_music()
 
             # jitter boss during intro
@@ -580,13 +597,7 @@ while running:
                     score += 500
                     next_level_score = score + 150
                     sound.play_explosion()
-<<<<<<< HEAD
-                    screen_shake = 30 
-                    
-=======
                     screen_shake = 30
-                   
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
                     try:
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx, current_boss.rect.centery)
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + 40, current_boss.rect.centery)
