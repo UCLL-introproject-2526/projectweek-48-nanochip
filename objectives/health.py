@@ -107,3 +107,23 @@ def draw_lives(screen, x, y, lives, font=None):
         50, 10,            
         segments=3          # Split into 3 blocks (1 per life)
     )
+
+
+def draw_boss_bar(screen, x, y, current_hp, max_hp, width=400, height=18, segments=20):
+  
+    # Label (small "BOSS") to the left
+    label_font = pygame.font.SysFont(None, 28)
+    label = label_font.render("BOSS", True, WHITE)
+    label_x = x - 60
+    label_y = y + (height // 2) - (label.get_height() // 2)
+    screen.blit(label, (label_x, label_y))
+
+    # Draw the segmented bar using existing helper
+    draw_segmented_bar(
+        screen,
+        x, y,
+        current_hp, max_hp,
+        NEON_RED,
+        width, height,
+        segments=segments
+    )
