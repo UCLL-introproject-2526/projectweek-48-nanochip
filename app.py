@@ -332,6 +332,10 @@ while running:
                         alt_img_path = path
                         break
 
+
+
+            
+
             current_boss = boss_module.Boss(WIDTH, HEIGHT, BOSS_TARGET_Y, variant=variant_name)
             current_boss.max_hp = 500 + (level * 100) 
             current_boss.hp = current_boss.max_hp
@@ -543,7 +547,9 @@ while running:
 
         if getattr(p, 'done', False):
             if p.type == powerups_module.EXTRA_LIFE:
-                if player_lives < 5: player_lives += 1
+                # Heal one heart (one health segment)
+                heal_amount = max(1, player_max_hp // 5)
+                player_hp = min(player_max_hp, player_hp + heal_amount)
             elif p.type == powerups_module.RAPID_FIRE:
                 rapid_fire_active = True
                 rapid_fire_end_time = current_time + 5000
