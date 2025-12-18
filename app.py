@@ -167,7 +167,7 @@ boss_bar_height = 80
 # RESET GAME
 # --------------------
 def reset_game():
-    global player_x, player_y, player_hp, player_lives0
+    global player_x, player_y, player_hp, player_lives
     global bullets, enemies, explosions, powerups
     global score, spawn_timer, last_hit_time, game_state
     global rapid_fire_active, shield_active, shield_angle
@@ -324,6 +324,9 @@ while running:
                         break
 
 <<<<<<< HEAD
+            # Level 10: second boss - prefer demon_boss.png first, then custom rewop images, then alien_boss2.png
+=======
+<<<<<<< HEAD
             # Level 10: second boss
 =======
 <<<<<<< HEAD
@@ -332,6 +335,7 @@ while running:
             # Level 10: second boss - prefer demon_boss.png first, then custom rewop images, then alien_boss2.png
 >>>>>>> 3b8984005f7f2116d654f6572d65717acd122968
 >>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
+>>>>>>> e1a767ed7aa987e69eea9c0626b3c2a11e7b42b3
             if level == 10:
                 # Prefer a specific demon boss image if present
                 demon_path = os.path.join(BASE_DIR, "objectives", "images", "demon_boss.png")
@@ -374,11 +378,14 @@ while running:
                 current_boss.target_y = BOSS_TARGET_Y + 12
 
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
             # Apply variant image if found
 =======
 <<<<<<< HEAD
             # Apply variant image if found
 =======
+>>>>>>> e1a767ed7aa987e69eea9c0626b3c2a11e7b42b3
             # Keep both the first and second bosses at a similar, slightly larger size
             # (fixes the earlier disproportionate second-boss scaling)
             if level in (5, 10):
@@ -393,8 +400,11 @@ while running:
                     current_boss.height = 112
                     current_boss.target_y = BOSS_TARGET_Y + 20
             # Boss variant: use a different image if one was found
+<<<<<<< HEAD
+=======
 >>>>>>> 3b8984005f7f2116d654f6572d65717acd122968
 >>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
+>>>>>>> e1a767ed7aa987e69eea9c0626b3c2a11e7b42b3
             try:
                 if alt_img_path:
                     loaded_img = pygame.image.load(alt_img_path).convert_alpha()
@@ -407,6 +417,9 @@ while running:
                     current_boss.rect.centery = cy
                 else:
 <<<<<<< HEAD
+                    # Fallback: scale and tint the default boss image to make it look different
+=======
+<<<<<<< HEAD
                     # Fallback tint
 =======
 <<<<<<< HEAD
@@ -415,6 +428,7 @@ while running:
                     # Fallback: scale and tint the default boss image to make it look different
 >>>>>>> 3b8984005f7f2116d654f6572d65717acd122968
 >>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
+>>>>>>> e1a767ed7aa987e69eea9c0626b3c2a11e7b42b3
                     try:
                         scaled = pygame.transform.scale(current_boss.image.copy(), (current_boss.width, current_boss.height))
                         scaled.fill((0, 100, 180, 0), special_flags=pygame.BLEND_RGBA_MULT)
