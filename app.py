@@ -189,10 +189,7 @@ def reset_game():
     next_level_score = 150
     current_boss = None
     spawn_rate = 40
-<<<<<<< HEAD
-=======
     
->>>>>>> 1e7a9c90f1718aa345fb110c6fa6bfc4ce9d3993
     # Reset Boss Intro vars
     boss_intro = False
     boss_intro_start = 0
@@ -236,8 +233,9 @@ else:
 # refresh display surface and sizes in case mode changed in menu
 screen = pygame.display.get_surface()
 WIDTH, HEIGHT = screen.get_size()
-last_windowed_size = (WIDTH, HEIGHT)
-
+if not is_fullscreen:
+    last_windowed_size = (WIDTH, HEIGHT)
+    
 # compute scale factor from original design (800x600)
 scale_x = WIDTH / 800.0
 scale_y = HEIGHT / 600.0
@@ -384,32 +382,12 @@ while running:
             variant_name = None
             alt_img_path = None
 
-<<<<<<< HEAD
-            # Try selected images for Level 5
-            if level == 5:
-                for name in ("alien_bosss.png", "alien_boss.png"):
-                    path = os.path.join(BASE_DIR, "objectives", "images", name)
-                    if os.path.exists(path):
-                        variant_name = name.rsplit('.', 1)[0]
-                        alt_img_path = path
-                        break
-
-            # Level 10 prefers a demon boss image or a custom variant
-            if level == 10:
-                demon_path = os.path.join(BASE_DIR, "objectives", "images", "demon_boss.png")
-                if os.path.exists(demon_path):
-                    variant_name = "demon_boss"
-                    alt_img_path = demon_path
-                else:
-                    for name in ("sotrak_rewop.png", "stark_rewop.png", "alien_boss2.png"):
-=======
             # Level 5: Demon Boss (stronger boss as requested)
             if level == 5:
                 # Prefer a 'demon' themed boss if available. Fallback to other boss images.
                 # Level 5: first major boss (prefer hard variants 'sotrak_rewop' or 'stark_rewop')
                 if level == 5:
                     for name in ("sotrak_rewop.png", "stark_rewop.png", "alien_boss.png"):
->>>>>>> 1e7a9c90f1718aa345fb110c6fa6bfc4ce9d3993
                         path = os.path.join(BASE_DIR, "objectives", "images", name)
                         if os.path.exists(path):
                             variant_name = name.rsplit('.', 1)[0]
@@ -442,36 +420,6 @@ while running:
             current_boss.max_hp = 500 + (level * 100) 
             current_boss.hp = current_boss.max_hp
 
-<<<<<<< HEAD
-            # Adjust Level 10 difficulty mildly
-            if level == 10:
-                current_boss.max_hp += 200
-                current_boss.hp = current_boss.max_hp
-                current_boss.speed_x = abs(current_boss.speed_x) + 1
-                current_boss.shoot_delay = min(getattr(current_boss, 'shoot_delay', 1000) + 150, 800)
-                setattr(current_boss, 'hard_behavior', True)
-
-            # Make Level 5 boss a bit tougher when no variant image provided
-            if level == 5 and variant_name is None:
-                current_boss.max_hp += 150
-                current_boss.hp = current_boss.max_hp
-                current_boss.speed_x = abs(current_boss.speed_x) + 1
-                current_boss.shoot_delay = max(350, current_boss.shoot_delay - 300)
-                current_boss.target_y = BOSS_TARGET_Y + 12
-
-            # Size tweaks for boss presentation
-            if level in (5, 10):
-                if level == 5:
-                    current_boss.width = 120
-                    current_boss.height = 96
-                    current_boss.target_y = getattr(current_boss, 'target_y', BOSS_TARGET_Y + 12)
-                else:
-                    current_boss.width = 140
-                    current_boss.height = 112
-                    current_boss.target_y = BOSS_TARGET_Y + 20
-
-            # Load or tint variant image if present
-=======
             # Make certain boss variants tougher
             if variant_name in ("sotrak_rewop", "stark_rewop"):
                 # very tough variants
@@ -496,7 +444,6 @@ while running:
             enemies.clear()
 
             # Apply variant image if found
->>>>>>> 1e7a9c90f1718aa345fb110c6fa6bfc4ce9d3993
             try:
                 if alt_img_path:
                     loaded_img = pygame.image.load(alt_img_path).convert_alpha()
@@ -507,16 +454,6 @@ while running:
                     current_boss.rect.centerx = cx
                     current_boss.rect.centery = cy
                 else:
-<<<<<<< HEAD
-                    scaled = pygame.transform.scale(current_boss.image.copy(), (current_boss.width, current_boss.height))
-                    scaled.fill((0, 100, 180, 0), special_flags=pygame.BLEND_RGBA_MULT)
-                    current_boss.image = scaled
-                    cx = current_boss.rect.centerx
-                    cy = current_boss.rect.centery
-                    current_boss.rect = current_boss.image.get_rect()
-                    current_boss.rect.centerx = cx
-                    current_boss.rect.centery = cy
-=======
                     # Fallback tint
                     try:
                         tinted = current_boss.image.copy()
@@ -524,7 +461,6 @@ while running:
                         current_boss.image = tinted
                     except Exception:
                         pass
->>>>>>> 1e7a9c90f1718aa345fb110c6fa6bfc4ce9d3993
             except Exception as e:
                 print(f"Warning: Could not set boss variant image: {e}")
 
@@ -627,11 +563,7 @@ while running:
 
             if elapsed >= boss_intro_duration:
                 boss_intro = False
-<<<<<<< HEAD
-                screen_shake = 6
-=======
                 screen_shake = 6 
->>>>>>> 1e7a9c90f1718aa345fb110c6fa6bfc4ce9d3993
                 sound.play_background_music()
 
             # jitter boss during intro
@@ -667,12 +599,8 @@ while running:
                     score += 500 
                     next_level_score = score + 150 
                     sound.play_explosion()
-<<<<<<< HEAD
-                    screen_shake = 30
-=======
                     screen_shake = 30 
                     
->>>>>>> 1e7a9c90f1718aa345fb110c6fa6bfc4ce9d3993
                     try:
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx, current_boss.rect.centery)
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + 40, current_boss.rect.centery)
