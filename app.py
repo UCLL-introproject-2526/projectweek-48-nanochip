@@ -61,6 +61,7 @@ base_invincible_duration = 1000
 # Enemy Defaults
 base_enemy_speed = 3
 spawn_rate = 40 
+BOSS_TARGET_Y = 70  # Y position where boss settles after intro
 
 # --------------------
 # GAME LISTS
@@ -130,6 +131,12 @@ level = 1
 next_level_score = 150
 current_boss = None
 
+# BOSS INTRO / CINEMATIC
+boss_intro = False
+boss_intro_start = 0
+boss_intro_duration = 2000    # ms
+boss_bar_height = 80
+
 # --------------------
 # RESET GAME
 # --------------------
@@ -164,6 +171,10 @@ def reset_game():
     next_level_score = 150
     current_boss = None
     spawn_rate = 40
+    boss_intro = False
+    boss_intro_start = 0
+    boss_intro_duration = 2000    # ms
+    boss_bar_height = 80
 
     sound.play_background_music()
     game_state = GAME_RUNNING
@@ -263,10 +274,70 @@ while running:
         if (level + 1) in [5, 10, 15, 20]:
             level += 1
             # SPAWN BOSS
-            current_boss = boss_module.Boss(WIDTH, HEIGHT)
+            # Determine variant image for special bosses (prefer specific filenames if present)
+            variant_name = None
+            alt_img_path = None
+
+            # Level 5: first boss - prefer 'alien_bosss.png' then fallback to 'alien_boss.png'
+            if level == 5:
+                for name in ("alien_bosss.png", "alien_boss.png"):
+                    path = os.path.join(BASE_DIR, "objectives", "images", name)
+                    if os.path.exists(path):
+                        variant_name = name.rsplit('.', 1)[0]
+                        alt_img_path = path
+                        break
+
+            # Level 10: second boss - prefer custom rewop images, then alien_boss2.png
+            if level == 10:
+                for name in ("sotrak_rewop.png", "stark_rewop.png", "alien_boss2.png"):
+                    path = os.path.join(BASE_DIR, "objectives", "images", name)
+                    if os.path.exists(path):
+                        variant_name = name.rsplit('.', 1)[0]
+                        alt_img_path = path
+                        break
+
+            current_boss = boss_module.Boss(WIDTH, HEIGHT, BOSS_TARGET_Y, variant=variant_name)
             current_boss.max_hp = 500 + (level * 100) 
             current_boss.hp = current_boss.max_hp
-            enemies.clear() 
+
+            # Make the second boss variant tougher
+            if variant_name in ("sotrak_rewop", "stark_rewop"):
+                current_boss.max_hp += 500
+                current_boss.hp = current_boss.max_hp
+
+            enemies.clear()
+
+            # Boss variant: use a different image if one was found
+            try:
+                if alt_img_path:
+                    loaded_img = pygame.image.load(alt_img_path).convert_alpha()
+                    current_boss.image = pygame.transform.scale(loaded_img, (current_boss.width, current_boss.height))
+                    # Preserve center position
+                    cx = current_boss.rect.centerx
+                    cy = current_boss.rect.centery
+                    current_boss.rect = current_boss.image.get_rect()
+                    current_boss.rect.centerx = cx
+                    current_boss.rect.centery = cy
+                else:
+                    # Fallback: tint the default boss image to make it look different
+                    try:
+                        tinted = current_boss.image.copy()
+                        tinted.fill((0, 100, 180, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                        current_boss.image = tinted
+                    except Exception:
+                        pass
+            except Exception as e:
+                print(f"Warning: Could not set boss variant image: {e}")
+
+            # Cinematic intro setup
+            boss_intro = True
+            boss_intro_start = pygame.time.get_ticks()
+            # start boss offscreen for a slide-in
+            current_boss.rect.y = -current_boss.rect.height
+            # dramatic audio/visuals
+            sound.stop_background_music()
+            sound.play_explosion()
+            screen_shake = 10
         else:
             level += 1
             next_level_score = level * 150
@@ -330,12 +401,51 @@ while running:
         )
     else:
         # BOSS LOGIC
-        current_boss.update() 
-        # Draw Boss with Shake
-        screen.blit(current_boss.image, (current_boss.rect.x + shake_x, current_boss.rect.y + shake_y))
+        if boss_intro:
+            elapsed = pygame.time.get_ticks() - boss_intro_start
+            t = min(1.0, elapsed / boss_intro_duration)
 
-        current_boss.bullets.update()
-        current_boss.bullets.draw(screen)
+            # ease-in motion
+            ease = t * t
+            start_y = -current_boss.rect.height
+            target_y = BOSS_TARGET_Y
+            current_boss.rect.y = int(start_y + (target_y - start_y) * ease)
+
+            # letterbox bars
+            bar_h = int(boss_bar_height * t)
+            pygame.draw.rect(screen, (0, 0, 0), (0, 0, WIDTH, bar_h))
+            pygame.draw.rect(screen, (0, 0, 0), (0, HEIGHT - bar_h, WIDTH, bar_h))
+
+            # dark overlay for drama
+            overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, int(120 * t)))
+            screen.blit(overlay, (0, 0))
+
+            # blinking warning text
+            if (elapsed // 300) % 2 == 0:
+                warn = big_font.render("BOSS INCOMING", True, (255, 40, 40))
+                screen.blit(warn, (WIDTH // 2 - warn.get_width() // 2, HEIGHT // 2 - 20))
+
+            # small particle burst once at start
+            if elapsed < 50:
+                explosions.append(Explosion(WIDTH // 2, 60))
+
+            # finish intro
+            if elapsed >= boss_intro_duration:
+                boss_intro = False
+                screen_shake = 6  # small aftermath shake
+                sound.play_background_music()
+
+            # draw boss with a little jitter while intro plays
+            screen.blit(current_boss.image, (current_boss.rect.x + random.randint(-2, 2), current_boss.rect.y + random.randint(-2, 2)))
+        else:
+            # normal boss update/draw
+            current_boss.update()
+            # Draw Boss with Shake
+            screen.blit(current_boss.image, (current_boss.rect.x + shake_x, current_boss.rect.y + shake_y))
+
+            current_boss.bullets.update()
+            current_boss.bullets.draw(screen)
 
         # Check collision: Boss Bullets vs Player
         player_rect = pygame.Rect(player_x, player_y, player_width, player_height)
@@ -397,7 +507,16 @@ while running:
         p.draw(screen)
         
         player_rect = pygame.Rect(player_x, player_y, player_width, player_height)
-        if player_rect.colliderect(p.rect):
+        # Start pickup animation on collision (don't apply instantly)
+        if not getattr(p, 'picked', False) and player_rect.colliderect(p.rect):
+            p.start_pickup()
+            try:
+                sound.play_explosion()
+            except Exception:
+                pass
+
+        # If pickup finished, apply effect and remove
+        if getattr(p, 'done', False):
             if p.type == powerups_module.EXTRA_LIFE:
                 if player_lives < 5: player_lives += 1
             elif p.type == powerups_module.RAPID_FIRE:
@@ -406,8 +525,12 @@ while running:
             elif p.type == powerups_module.SHIELD:
                 shield_active = True
                 shield_end_time = current_time + 5000
+            try:
+                sound.play_shoot()
+            except Exception:
+                pass
             powerups.remove(p)
-        elif p.rect.y > HEIGHT:
+        elif p.rect.y > HEIGHT and not getattr(p, 'picked', False):
             powerups.remove(p)
 
     # COLLISION PLAYER (Normal Enemies)
@@ -427,33 +550,17 @@ while running:
                         enemies.remove(enemy)
                         sound.play_explosion()
 
-    # CHECK DEATH AND RESPAWN
+    # CHECK DEATH: Game Over when HP reaches zero
     if player_hp <= 0:
-        player_lives -= 1
-        if player_lives > 0:
-            player_hp = player_max_hp
-            enemies.clear()
-            bullets.clear()
-            explosions.clear()
-            powerups.clear()
-            rapid_fire_active = False
-            shield_active = False
-            
-            # --- FIX: Prevent Level Skip on Death during Boss Fight ---
-            if current_boss:
-                # If there is a boss, keep it active and reset its position
-                current_boss.rect.centerx = WIDTH // 2
-                current_boss.rect.y = 50
-            else:
-                # Only clear boss variable if we aren't fighting one
-                current_boss = None
-            
-            screen_shake = 0
-            pygame.time.delay(800)
-        else:
-            sound.stop_background_music()
-            sound.play_game_over()
-            game_state = GAME_OVER
+        # Immediately end the game when all heart HP is depleted
+        sound.stop_background_music()
+        sound.play_game_over()
+        game_state = GAME_OVER
+        # If a boss fight was active, ensure boss is placed correctly when restarting later
+        if current_boss:
+            current_boss.rect.centerx = WIDTH // 2
+            current_boss.rect.y = BOSS_TARGET_Y
+        screen_shake = 0
 
     # DRAW PLAYER (With Shake)
     is_hit_invincible = (current_time - last_hit_time < base_invincible_duration)
@@ -484,7 +591,6 @@ while running:
 
     # UI
     health.draw_health_bar(screen, 10, 10, player_hp, player_max_hp)
-    health.draw_lives(screen, 10, 40, player_lives, font)
 
     score_text = font.render(f"Score: {score}", True, WHITE)
     screen.blit(score_text, (WIDTH - 150, 10))
@@ -493,8 +599,14 @@ while running:
     screen.blit(level_text, (WIDTH // 2 - 50, 10))
     
     if current_boss:
-        warn_text = big_font.render("BOSS FIGHT!", True, RED)
-        screen.blit(warn_text, (WIDTH // 2 - 140, HEIGHT // 2))
+        # Draw Boss HP Bar centered near top
+        bar_width = 400
+        bar_x = WIDTH // 2 - bar_width // 2
+        bar_y = 40
+        health.draw_boss_bar(screen, bar_x, bar_y, current_boss.hp, current_boss.max_hp, width=bar_width, height=18, segments=20)
+        pct = int(current_boss.hp * 100 / max(1, current_boss.max_hp))
+        pct_text = font.render(f"{pct}%", True, RED)
+        screen.blit(pct_text, (bar_x + bar_width + 12, bar_y))
 
     if rapid_fire_active:
         rf_text = font.render("RAPID FIRE!", True, CYAN)
