@@ -38,8 +38,8 @@ class Boss(pygame.sprite.Sprite):
 
         # Variant sizing: make the stronger/second boss a bit larger
         if self.variant in ("sotrak_rewop", "stark_rewop"):
-            self.width = int(self.width * 1.25)
-            self.height = int(self.height * 1.25)
+            self.width = int(self.width * 2)
+            self.height = int(self.height * 2)
 
         # Default image surface (fallback)
         self.image = pygame.Surface((self.width, self.height))
@@ -53,6 +53,7 @@ class Boss(pygame.sprite.Sprite):
             if os.path.exists(img_path):
                 loaded_img = pygame.image.load(img_path).convert_alpha()
                 self.image = pygame.transform.scale(loaded_img, (self.width, self.height))
+                
         except Exception as e:
             print(f"Warning: Could not load Boss image. Using square. {e}")
 
@@ -66,16 +67,22 @@ class Boss(pygame.sprite.Sprite):
         # Default movement
         self.speed_x = 3
         # Variant tweaks (stronger boss)
-        if self.variant in ("sotrak_rewop", "stark_rewop"):
+        if self.variant in ("sotrak_rewop", "stark_rewop", "demon_boss"):
             self.speed_x = 5
         self.max_hp = 500
         self.hp = self.max_hp
+        # Track which HP thresholds have already spawned powerups (avoid duplicates)
+        self.powerup_thresholds_spawned = set()
         
         # 4. SHOOTING SETUP
         self.bullets = pygame.sprite.Group()
         self.last_shot_time = pygame.time.get_ticks()
-        # Faster shoots for variant
-        self.shoot_delay = 700 if self.variant in ("sotrak_rewop", "stark_rewop") else 1000  # ms
+        # Base shoot delay (ms)
+        self.shoot_delay = 1000
+        if self.variant in ("sotrak_rewop", "stark_rewop", "demon_boss"):
+            self.shoot_delay = 800  # slightly faster for stronger variants (nerfed)
+        # Mark hard behavior for easy checks
+        self.hard_behavior = self.variant in ("sotrak_rewop", "stark_rewop", "demon_boss")
 
     def update(self):
         # MOVE: Bounce left and right
@@ -87,6 +94,10 @@ class Boss(pygame.sprite.Sprite):
         elif self.rect.left <= 0:
             self.speed_x = abs(self.speed_x)  # Go Right
 
+        # Hard variants occasionally flip direction to be less predictable (rarer)
+        if getattr(self, 'hard_behavior', False) and random.random() < 0.01:
+            self.speed_x = -self.speed_x
+
         # SHOOT: Check timer
         now = pygame.time.get_ticks()
         if now - self.last_shot_time > self.shoot_delay:
@@ -95,13 +106,19 @@ class Boss(pygame.sprite.Sprite):
 
     def shoot(self):
         # Variant: triple spread shot for the harder boss
-        if self.variant in ("sotrak_rewop", "stark_rewop"):
-            # center, left, right bullets
+        if self.variant in ("sotrak_rewop", "stark_rewop", "demon_boss"):
+            # Triple spread for harder variants (nerfed: no flank bullets, slightly milder velocities)
             center = BossBullet(self.rect.centerx, self.rect.bottom, dx=0, dy=7)
             left = BossBullet(self.rect.centerx - 12, self.rect.bottom, dx=-2, dy=6)
             right = BossBullet(self.rect.centerx + 12, self.rect.bottom, dx=2, dy=6)
             self.bullets.add(center, left, right)
         else:
-            # Single straight bullet
-            bullet = BossBullet(self.rect.centerx, self.rect.bottom)
-            self.bullets.add(bullet)
+            # Non-variant boss: usually single straight bullet, but occasionally fire a triple spread
+            if random.random() < 0.20:  # 20% chance to fire a spread shot
+                center = BossBullet(self.rect.centerx, self.rect.bottom, dx=0, dy=6)
+                left = BossBullet(self.rect.centerx - 10, self.rect.bottom, dx=-1.5, dy=6)
+                right = BossBullet(self.rect.centerx + 10, self.rect.bottom, dx=1.5, dy=6)
+                self.bullets.add(center, left, right)
+            else:
+                bullet = BossBullet(self.rect.centerx, self.rect.bottom)
+                self.bullets.add(bullet)
