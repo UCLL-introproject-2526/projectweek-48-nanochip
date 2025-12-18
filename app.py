@@ -60,7 +60,7 @@ base_invincible_duration = 1000
 
 # Enemy Defaults
 base_enemy_speed = 3
-spawn_rate = 40
+spawn_rate = 40 
 BOSS_TARGET_Y = 70  # Y position where boss settles after intro
 
 # --------------------
@@ -201,7 +201,7 @@ def reset_game():
     next_level_score = 150
     current_boss = None
     spawn_rate = 40
-
+    
     # Reset Boss Intro vars
     boss_intro = False
     boss_intro_start = 0
@@ -323,71 +323,31 @@ while running:
                         alt_img_path = path
                         break
 
-            # Level 10: second boss - prefer demon_boss.png first, then custom rewop images, then alien_boss2.png
             # Level 10: second boss
-            # Level 10: second boss
-            # Level 10: second boss - prefer demon_boss.png first, then custom rewop images, then alien_boss2.png
             if level == 10:
-                # Prefer a specific demon boss image if present
-                demon_path = os.path.join(BASE_DIR, "objectives", "images", "demon_boss.png")
-                if os.path.exists(demon_path):
-                    variant_name = "demon_boss"
-                    alt_img_path = demon_path
-                else:
-                    for name in ("sotrak_rewop.png", "stark_rewop.png", "alien_boss2.png"):
-                        path = os.path.join(BASE_DIR, "objectives", "images", name)
-                        if os.path.exists(path):
-                            variant_name = name.rsplit('.', 1)[0]
-                            alt_img_path = path
-                            break
+                for name in ("sotrak_rewop.png", "stark_rewop.png", "alien_boss2.png"):
+                    path = os.path.join(BASE_DIR, "objectives", "images", name)
+                    if os.path.exists(path):
+                        variant_name = name.rsplit('.', 1)[0]
+                        alt_img_path = path
+                        break
 
 
 
             
 
             current_boss = boss_module.Boss(WIDTH, HEIGHT, BOSS_TARGET_Y, variant=variant_name)
-            current_boss.max_hp = 500 + (level * 100)
+            current_boss.max_hp = 500 + (level * 100) 
             current_boss.hp = current_boss.max_hp
 
-            # Tone down Level 10 difficulty moderately
-            if level == 10:
-                # Moderate HP bump (smaller than before)
-                current_boss.max_hp += 200
+            # Make the second boss variant tougher
+            if variant_name in ("sotrak_rewop", "stark_rewop"):
+                current_boss.max_hp += 500
                 current_boss.hp = current_boss.max_hp
-                # Slightly increase speed (was +2, now +1)
-                current_boss.speed_x = abs(current_boss.speed_x) + 1
-                # Make shooting less aggressive (longer shoot delay than before)
-                current_boss.shoot_delay = min(getattr(current_boss, 'shoot_delay', 1000) + 150, 800)
-                # Keep hard behavior flag enabled but boss is nerfed
-                setattr(current_boss, 'hard_behavior', True)
 
-            # Make the first boss a bit tougher: slightly more HP, faster movement and quicker shots
-            if level == 5 and variant_name is None:
-                current_boss.max_hp += 150
-                current_boss.hp = current_boss.max_hp
-                # Increase horizontal speed slightly (more aggressive movement)
-                current_boss.speed_x = abs(current_boss.speed_x) + 1
-                # Lower shoot delay so boss fires a bit more often (ms)
-                current_boss.shoot_delay = max(350, current_boss.shoot_delay - 300)
-                # Set a slightly lower settling position so the boss sits a bit down
-                current_boss.target_y = BOSS_TARGET_Y + 12
+            enemies.clear()
 
             # Apply variant image if found
-            # Apply variant image if found
-            # Keep both the first and second bosses at a similar, slightly larger size
-            # (fixes the earlier disproportionate second-boss scaling)
-            if level in (5, 10):
-                # Level 5: slightly larger than default
-                if level == 5:
-                    current_boss.width = 120
-                    current_boss.height = 96
-                    current_boss.target_y = getattr(current_boss, 'target_y', BOSS_TARGET_Y + 12)
-                else:
-                    # Level 10: a bit bigger than Level 5
-                    current_boss.width = 140
-                    current_boss.height = 112
-                    current_boss.target_y = BOSS_TARGET_Y + 20
-            # Boss variant: use a different image if one was found
             try:
                 if alt_img_path:
                     loaded_img = pygame.image.load(alt_img_path).convert_alpha()
@@ -399,20 +359,11 @@ while running:
                     current_boss.rect.centerx = cx
                     current_boss.rect.centery = cy
                 else:
-                    # Fallback: scale and tint the default boss image to make it look different
                     # Fallback tint
-                    # Fallback tint
-                    # Fallback: scale and tint the default boss image to make it look different
                     try:
-                        scaled = pygame.transform.scale(current_boss.image.copy(), (current_boss.width, current_boss.height))
-                        scaled.fill((0, 100, 180, 0), special_flags=pygame.BLEND_RGBA_MULT)
-                        current_boss.image = scaled
-                        # Preserve center position
-                        cx = current_boss.rect.centerx
-                        cy = current_boss.rect.centery
-                        current_boss.rect = current_boss.image.get_rect()
-                        current_boss.rect.centerx = cx
-                        current_boss.rect.centery = cy
+                        tinted = current_boss.image.copy()
+                        tinted.fill((0, 100, 180, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                        current_boss.image = tinted
                     except Exception:
                         pass
             except Exception as e:
@@ -434,7 +385,7 @@ while running:
     # TIMERS
     if rapid_fire_active and current_time > rapid_fire_end_time:
         rapid_fire_active = False
-   
+    
     if shield_active:
         if current_time > shield_end_time:
             shield_active = False
@@ -445,7 +396,7 @@ while running:
     # MOVEMENT
     keys = pygame.key.get_pressed()
     current_speed = player_speed + 2 if rapid_fire_active else player_speed
-   
+    
     if keys[pygame.K_LEFT]:
         player_x -= current_speed
         if player_x + player_width < 0: player_x = WIDTH
@@ -469,10 +420,10 @@ while running:
     # ---------------------------
     if current_boss is None:
         spawn_timer += 1
-        if spawn_timer > spawn_rate:
+        if spawn_timer > spawn_rate: 
             smarter_enemies.spawn_enemy(enemies, WIDTH, 50, 40)
             spawn_timer = 0
-           
+            
         current_enemy_speed = base_enemy_speed + (level * 0.2)
         score = smarter_enemies.update_enemies(
             enemies=enemies,
@@ -489,19 +440,13 @@ while running:
     else:
         # BOSS LOGIC
         if boss_intro:
-            # Ensure any remaining enemies are cleared when the boss intro starts
-            # so they don't linger frozen on screen during the boss fight.
-            if enemies:
-                enemies.clear()
-                spawn_timer = 0
-
             elapsed = pygame.time.get_ticks() - boss_intro_start
             t = min(1.0, elapsed / boss_intro_duration)
 
-            # ease-in motion (honors per-boss target if set)
+            # ease-in motion
             ease = t * t
             start_y = -current_boss.rect.height
-            target_y = getattr(current_boss, 'target_y', BOSS_TARGET_Y)
+            target_y = BOSS_TARGET_Y
             current_boss.rect.y = int(start_y + (target_y - start_y) * ease)
 
             # letterbox bars
@@ -525,8 +470,6 @@ while running:
             if elapsed >= boss_intro_duration:
                 boss_intro = False
                 screen_shake = 6 
-                screen_shake = 6
-
                 sound.play_background_music()
 
             # jitter boss during intro
@@ -556,63 +499,44 @@ while running:
                 current_boss.hp -= 10
                 explosions.append(Explosion(rect.x, rect.y))
                 bullets.remove(b_data)
-               
+                
                 # BOSS DEATH
                 if current_boss.hp <= 0:
-                    score += 500
-                    next_level_score = score + 150
+                    score += 500 
+                    next_level_score = score + 150 
                     sound.play_explosion()
                     screen_shake = 30 
                     
-                    screen_shake = 30
-                   
                     try:
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx, current_boss.rect.centery)
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + 40, current_boss.rect.centery)
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx - 40, current_boss.rect.centery)
                     except AttributeError:
                         pass
-                    current_boss = None
+                    current_boss = None 
                 break
-       
+        
         # Check collision: Player vs Boss Body
         if current_boss and player_rect.colliderect(current_boss.rect):
             if not shield_active:
                 if current_time - last_hit_time > base_invincible_duration:
-                     player_hp -= 30
+                     player_hp -= 30 
                      last_hit_time = current_time
                      sound.play_explosion()
 
         # Random Powerup Drop during Boss Fight
-        if current_boss:
-            # Increase random drop chance during second boss variants
-            # Lowered to reduce generosity
-            drop_chance = 4 if current_boss.variant in ("sotrak_rewop", "stark_rewop") else 2
-            if random.randint(1, 100) <= drop_chance:
-                drop_x = random.randint(50, WIDTH - 50)
-                try:
-                    powerups_module.spawn_powerup_at(powerups, drop_x, -50)
-                except AttributeError:
-                    pass
-
-            # Guaranteed drops at HP thresholds for the second boss (50%, 25%)
-            # Removed the 75% drop to make the fight less generous
-            if current_boss.variant in ("sotrak_rewop", "stark_rewop"):
-                hp_pct = current_boss.hp / max(1, current_boss.max_hp)
-                for t in (0.5, 0.25):
-                    if hp_pct <= t and t not in getattr(current_boss, 'powerup_thresholds_spawned', set()):
-                        try:
-                            # Spawn near the boss so it feels like a boss drop
-                            powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + random.randint(-40, 40), current_boss.rect.bottom + 10)
-                        except AttributeError:
-                            pass
-                        current_boss.powerup_thresholds_spawned.add(t)
+        if random.randint(1, 100) <= 2:
+             drop_x = random.randint(50, WIDTH - 50)
+             try:
+                 powerups_module.spawn_powerup_at(powerups, drop_x, -50)
+             except AttributeError:
+                 pass
 
     # POWERUPS
     for p in powerups[:]:
         p.update()
         p.draw(screen)
-       
+        
         player_rect = pygame.Rect(player_x, player_y, player_width, player_height)
         if not getattr(p, 'picked', False) and player_rect.colliderect(p.rect):
             p.start_pickup()
@@ -623,8 +547,7 @@ while running:
 
         if getattr(p, 'done', False):
             if p.type == powerups_module.EXTRA_LIFE:
-                # Restore health by one heart (one segment = 20 HP)
-                player_hp = min(player_max_hp, player_hp + 20)
+                if player_lives < 5: player_lives += 1
             elif p.type == powerups_module.RAPID_FIRE:
                 rapid_fire_active = True
                 rapid_fire_end_time = current_time + 5000
@@ -700,7 +623,7 @@ while running:
 
     level_text = font.render(f"LEVEL {level}", True, CYAN)
     screen.blit(level_text, (WIDTH // 2 - 50, 10))
-   
+    
     if current_boss:
         bar_width = 400
         bar_x = WIDTH // 2 - bar_width // 2
@@ -713,7 +636,7 @@ while running:
     if rapid_fire_active:
         rf_text = font.render("RAPID FIRE!", True, CYAN)
         screen.blit(rf_text, (WIDTH//2 - 60, HEIGHT - 40))
-       
+        
     if shield_active:
         sh_text = font.render("SHIELD ACTIVE", True, (255, 255, 0))
         y_pos = HEIGHT - 70 if rapid_fire_active else HEIGHT - 40
@@ -721,4 +644,4 @@ while running:
 
     pygame.display.flip()
 
-pygame.quit()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+pygame.quit()
