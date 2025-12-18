@@ -201,11 +201,7 @@ def reset_game():
     next_level_score = 150
     current_boss = None
     spawn_rate = 40
-<<<<<<< HEAD
-    
-=======
-   
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
+
     # Reset Boss Intro vars
     boss_intro = False
     boss_intro_start = 0
@@ -327,19 +323,10 @@ while running:
                         alt_img_path = path
                         break
 
-<<<<<<< HEAD
             # Level 10: second boss - prefer demon_boss.png first, then custom rewop images, then alien_boss2.png
-=======
-<<<<<<< HEAD
             # Level 10: second boss
-=======
-<<<<<<< HEAD
             # Level 10: second boss
-=======
             # Level 10: second boss - prefer demon_boss.png first, then custom rewop images, then alien_boss2.png
->>>>>>> 3b8984005f7f2116d654f6572d65717acd122968
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
->>>>>>> e1a767ed7aa987e69eea9c0626b3c2a11e7b42b3
             if level == 10:
                 # Prefer a specific demon boss image if present
                 demon_path = os.path.join(BASE_DIR, "objectives", "images", "demon_boss.png")
@@ -353,6 +340,10 @@ while running:
                             variant_name = name.rsplit('.', 1)[0]
                             alt_img_path = path
                             break
+
+
+
+            
 
             current_boss = boss_module.Boss(WIDTH, HEIGHT, BOSS_TARGET_Y, variant=variant_name)
             current_boss.max_hp = 500 + (level * 100)
@@ -381,15 +372,8 @@ while running:
                 # Set a slightly lower settling position so the boss sits a bit down
                 current_boss.target_y = BOSS_TARGET_Y + 12
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
             # Apply variant image if found
-=======
-<<<<<<< HEAD
             # Apply variant image if found
-=======
->>>>>>> e1a767ed7aa987e69eea9c0626b3c2a11e7b42b3
             # Keep both the first and second bosses at a similar, slightly larger size
             # (fixes the earlier disproportionate second-boss scaling)
             if level in (5, 10):
@@ -404,11 +388,6 @@ while running:
                     current_boss.height = 112
                     current_boss.target_y = BOSS_TARGET_Y + 20
             # Boss variant: use a different image if one was found
-<<<<<<< HEAD
-=======
->>>>>>> 3b8984005f7f2116d654f6572d65717acd122968
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
->>>>>>> e1a767ed7aa987e69eea9c0626b3c2a11e7b42b3
             try:
                 if alt_img_path:
                     loaded_img = pygame.image.load(alt_img_path).convert_alpha()
@@ -420,19 +399,10 @@ while running:
                     current_boss.rect.centerx = cx
                     current_boss.rect.centery = cy
                 else:
-<<<<<<< HEAD
                     # Fallback: scale and tint the default boss image to make it look different
-=======
-<<<<<<< HEAD
                     # Fallback tint
-=======
-<<<<<<< HEAD
                     # Fallback tint
-=======
                     # Fallback: scale and tint the default boss image to make it look different
->>>>>>> 3b8984005f7f2116d654f6572d65717acd122968
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
->>>>>>> e1a767ed7aa987e69eea9c0626b3c2a11e7b42b3
                     try:
                         scaled = pygame.transform.scale(current_boss.image.copy(), (current_boss.width, current_boss.height))
                         scaled.fill((0, 100, 180, 0), special_flags=pygame.BLEND_RGBA_MULT)
@@ -554,9 +524,7 @@ while running:
 
             if elapsed >= boss_intro_duration:
                 boss_intro = False
-<<<<<<< HEAD
                 screen_shake = 6 
-=======
                 screen_shake = 6
 
                 sound.play_background_music()
@@ -594,13 +562,10 @@ while running:
                     score += 500
                     next_level_score = score + 150
                     sound.play_explosion()
-<<<<<<< HEAD
                     screen_shake = 30 
                     
-=======
                     screen_shake = 30
                    
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
                     try:
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx, current_boss.rect.centery)
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + 40, current_boss.rect.centery)
