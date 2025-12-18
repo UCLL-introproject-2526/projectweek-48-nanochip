@@ -27,7 +27,7 @@ import objectives.boss as boss_module
 # SOUND INIT
 # --------------------
 sound.init_sound()
-sound.play_background_music()
+
 
 # --------------------
 # DISPLAY
@@ -36,6 +36,8 @@ WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Spaceship Game - Sector 48")
 clock = pygame.time.Clock()
+# remember last known windowed size so ESC can restore/center
+last_windowed_size = (WIDTH, HEIGHT)
 
 # --------------------
 # COLORS & FONT
@@ -112,28 +114,14 @@ game_state = GAME_RUNNING
 screen_shake = 0
 
 # --------------------
-# BACKGROUND & ASSETS
+# BACKGROUND & ASSETS (deferred load to speed startup)
 # --------------------
-bg = Background("spaceship.jpg", WIDTH, HEIGHT)
+bg = None
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
+player_img = None
+enemy_img = None
 player_img_path = os.path.join(BASE_DIR, "objectives", "images", "player_ship.png")
 enemy_img_path = os.path.join(BASE_DIR, "objectives", "images", "enemy_ship.png")
-
-# Load Images (Fallback logic)
-try:
-    player_img = pygame.image.load(player_img_path).convert_alpha()
-    player_img = pygame.transform.scale(player_img, (player_width, player_height))
-except FileNotFoundError:
-    player_img = pygame.Surface((player_width, player_height))
-    player_img.fill((0, 255, 0))
-
-try:
-    enemy_img = pygame.image.load(enemy_img_path).convert_alpha()
-    enemy_img = pygame.transform.scale(enemy_img, (50, 40))
-except FileNotFoundError:
-    enemy_img = pygame.Surface((50, 40))
-    enemy_img.fill((255, 0, 0))
 
 # --------------------
 # VARIABLES
@@ -234,7 +222,60 @@ def draw_player(x, y):
 # --------------------
 # START MENU
 # --------------------
-action = start_menu.start_menu(screen, clock)
+# start_menu may change display mode (fullscreen). it returns (action, is_fullscreen)
+res = start_menu.start_menu(screen, clock)
+if isinstance(res, tuple) and len(res) == 2:
+    action, is_fullscreen = res
+else:
+    action = res
+    is_fullscreen = False
+
+# refresh display surface and sizes in case mode changed in menu
+screen = pygame.display.get_surface()
+WIDTH, HEIGHT = screen.get_size()
+if not is_fullscreen:
+    last_windowed_size = (WIDTH, HEIGHT)
+    
+# compute scale factor from original design (800x600)
+scale_x = WIDTH / 800.0
+scale_y = HEIGHT / 600.0
+
+# scale player/enemy sizes to fit the new window
+player_width = max(16, int(50 * scale_x))
+player_height = max(12, int(40 * scale_y))
+
+# Load images now if they were deferred
+try:
+    if player_img is None:
+        try:
+            player_img = pygame.image.load(player_img_path).convert_alpha()
+        except Exception:
+            player_img = pygame.Surface((player_width, player_height))
+            player_img.fill((0, 255, 0))
+    if enemy_img is None:
+        try:
+            enemy_img = pygame.image.load(enemy_img_path).convert_alpha()
+        except Exception:
+            enemy_img = pygame.Surface((50, 40))
+            enemy_img.fill((255, 0, 0))
+except Exception:
+    pass
+
+try:
+    # rescale player image to new size
+    player_img = pygame.transform.scale(player_img, (player_width, player_height))
+except Exception:
+    pass
+try:
+    enemy_w = max(16, int(50 * scale_x))
+    enemy_h = max(12, int(40 * scale_y))
+    enemy_img = pygame.transform.scale(enemy_img, (enemy_w, enemy_h))
+except Exception:
+    pass
+
+# recreate background to match new size
+bg = Background("spaceship.jpg", WIDTH, HEIGHT)
+
 if action == "start":
     reset_game()
 elif action == "quit":
@@ -256,6 +297,34 @@ while running:
             sys.exit()
 
         if event.type == pygame.KEYDOWN:
+            # ESC should restore or center window (mid-screen)
+            if event.key == pygame.K_ESCAPE:
+                try:
+                    info = pygame.display.Info()
+                    surf = pygame.display.get_surface()
+                    flags = surf.get_flags()
+                    # if fullscreen -> restore to last windowed size, else keep current
+                    if flags & pygame.FULLSCREEN:
+                        win_w, win_h = last_windowed_size
+                    else:
+                        win_w, win_h = surf.get_size()
+
+                    pos_x = max(0, (info.current_w - win_w) // 2)
+                    pos_y = max(0, (info.current_h - win_h) // 2)
+                    os.environ['SDL_VIDEO_WINDOW_POS'] = f"{pos_x},{pos_y}"
+                    pygame.display.set_mode((win_w, win_h))
+                    # refresh surfaces and sizes
+                    screen = pygame.display.get_surface()
+                    WIDTH, HEIGHT = screen.get_size()
+                    # update last windowed size
+                    last_windowed_size = (WIDTH, HEIGHT)
+                    try:
+                        bg = Background("spaceship.jpg", WIDTH, HEIGHT)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+                continue
             # PAUSE TOGGLE
             if event.key == pygame.K_p:
                 if game_state == GAME_RUNNING:
@@ -307,10 +376,9 @@ while running:
 
     # 5. LEVEL UP LOGIC
     if score >= next_level_score and current_boss is None:
+        # If the next level is a boss level, prepare and spawn a boss
         if (level + 1) in [5, 10, 15, 20]:
             level += 1
-            # SPAWN BOSS
-            # Determine variant image for special bosses
             variant_name = None
             alt_img_path = None
 
@@ -380,7 +448,6 @@ while running:
                 if alt_img_path:
                     loaded_img = pygame.image.load(alt_img_path).convert_alpha()
                     current_boss.image = pygame.transform.scale(loaded_img, (current_boss.width, current_boss.height))
-                    # Preserve center position
                     cx = current_boss.rect.centerx
                     cy = current_boss.rect.centery
                     current_boss.rect = current_boss.image.get_rect()
@@ -397,7 +464,6 @@ while running:
             except Exception as e:
                 print(f"Warning: Could not set boss variant image: {e}")
 
-            # Cinematic intro setup
             boss_intro = True
             boss_intro_start = pygame.time.get_ticks()
             current_boss.rect.y = -current_boss.rect.height
