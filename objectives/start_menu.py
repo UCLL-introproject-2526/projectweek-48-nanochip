@@ -4,6 +4,11 @@ import os
 from objectives import sound 
 import math
 
+
+def _get_desktop_fullscreen_flag():
+    # Use simple fullscreen flag to match previous behavior
+    return pygame.FULLSCREEN
+
 # COLORS
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -221,7 +226,8 @@ def start_menu(screen, clock):
                     try:
                         info = pygame.display.Info()
                         if is_fullscreen:
-                            pygame.display.set_mode((info.current_w, info.current_h), pygame.FULLSCREEN)
+                            flags = _get_desktop_fullscreen_flag()
+                            pygame.display.set_mode((info.current_w, info.current_h), flags)
                         else:
                             # restore to the initial windowed size and center
                             win_w, win_h = initial_size
@@ -251,6 +257,7 @@ def start_menu(screen, clock):
                             is_fullscreen = False
                             try:
                                 info = pygame.display.Info()
+                                flags = _get_desktop_fullscreen_flag()
                                 win_w, win_h = initial_size
                                 pos_x = max(0, (info.current_w - win_w) // 2)
                                 pos_y = max(0, (info.current_h - win_h) // 2)
