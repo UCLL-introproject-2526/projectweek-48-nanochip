@@ -306,15 +306,16 @@ while running:
             current_boss.max_hp = 500 + (level * 100) 
             current_boss.hp = current_boss.max_hp
 
-            # Extra difficulty tuning for the second boss (Level 10)
+            # Tone down Level 10 difficulty moderately
             if level == 10:
-                # Increase HP and aggressiveness
-                current_boss.max_hp += 400
+                # Moderate HP bump (smaller than before)
+                current_boss.max_hp += 200
                 current_boss.hp = current_boss.max_hp
-                current_boss.speed_x = abs(current_boss.speed_x) + 2
-                # Reduce shoot delay so boss fires more often
-                current_boss.shoot_delay = max(300, getattr(current_boss, 'shoot_delay', 1000) - 300)
-                # Ensure the harder behavior flag is set on the boss
+                # Slightly increase speed (was +2, now +1)
+                current_boss.speed_x = abs(current_boss.speed_x) + 1
+                # Make shooting less aggressive (longer shoot delay than before)
+                current_boss.shoot_delay = min(getattr(current_boss, 'shoot_delay', 1000) + 150, 800)
+                # Keep hard behavior flag enabled but boss is nerfed
                 setattr(current_boss, 'hard_behavior', True)
 
             # Make the first boss a bit tougher: slightly more HP, faster movement and quicker shots

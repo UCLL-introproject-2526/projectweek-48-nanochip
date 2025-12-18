@@ -80,7 +80,7 @@ class Boss(pygame.sprite.Sprite):
         # Base shoot delay (ms)
         self.shoot_delay = 1000
         if self.variant in ("sotrak_rewop", "stark_rewop", "demon_boss"):
-            self.shoot_delay = 600  # faster for stronger variants
+            self.shoot_delay = 800  # slightly faster for stronger variants (nerfed)
         # Mark hard behavior for easy checks
         self.hard_behavior = self.variant in ("sotrak_rewop", "stark_rewop", "demon_boss")
 
@@ -94,8 +94,8 @@ class Boss(pygame.sprite.Sprite):
         elif self.rect.left <= 0:
             self.speed_x = abs(self.speed_x)  # Go Right
 
-        # Hard variants occasionally flip direction to be less predictable
-        if getattr(self, 'hard_behavior', False) and random.random() < 0.02:
+        # Hard variants occasionally flip direction to be less predictable (rarer)
+        if getattr(self, 'hard_behavior', False) and random.random() < 0.01:
             self.speed_x = -self.speed_x
 
         # SHOOT: Check timer
@@ -107,13 +107,11 @@ class Boss(pygame.sprite.Sprite):
     def shoot(self):
         # Variant: triple spread shot for the harder boss
         if self.variant in ("sotrak_rewop", "stark_rewop", "demon_boss"):
-            # Aggressive triple spread + extra fast flank bullets for harder variants
-            center = BossBullet(self.rect.centerx, self.rect.bottom, dx=0, dy=8)
-            left = BossBullet(self.rect.centerx - 14, self.rect.bottom, dx=-3, dy=7)
-            right = BossBullet(self.rect.centerx + 14, self.rect.bottom, dx=3, dy=7)
-            flank_left = BossBullet(self.rect.left + 8, self.rect.centery, dx=-5, dy=9, color=(220,30,30))
-            flank_right = BossBullet(self.rect.right - 8, self.rect.centery, dx=5, dy=9, color=(220,30,30))
-            self.bullets.add(center, left, right, flank_left, flank_right)
+            # Triple spread for harder variants (nerfed: no flank bullets, slightly milder velocities)
+            center = BossBullet(self.rect.centerx, self.rect.bottom, dx=0, dy=7)
+            left = BossBullet(self.rect.centerx - 12, self.rect.bottom, dx=-2, dy=6)
+            right = BossBullet(self.rect.centerx + 12, self.rect.bottom, dx=2, dy=6)
+            self.bullets.add(center, left, right)
         else:
             # Non-variant boss: usually single straight bullet, but occasionally fire a triple spread
             if random.random() < 0.20:  # 20% chance to fire a spread shot
