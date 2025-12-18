@@ -558,7 +558,7 @@ while running:
                 screen_shake = 6 
 =======
                 screen_shake = 6
->>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
+
                 sound.play_background_music()
 
             # jitter boss during intro
