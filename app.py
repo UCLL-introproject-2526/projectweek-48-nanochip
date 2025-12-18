@@ -314,18 +314,30 @@ while running:
             variant_name = None
             alt_img_path = None
 
-            # Level 5: first boss
+            # Level 5: Demon Boss (stronger boss as requested)
             if level == 5:
-                for name in ("alien_bosss.png", "alien_boss.png"):
+                # Prefer a 'demon' themed boss if available. Fallback to other boss images.
+                # Level 5: first major boss (prefer hard variants 'sotrak_rewop' or 'stark_rewop')
+                if level == 5:
+                    for name in ("sotrak_rewop.png", "stark_rewop.png", "alien_boss.png"):
+                        path = os.path.join(BASE_DIR, "objectives", "images", name)
+                        if os.path.exists(path):
+                            variant_name = name.rsplit('.', 1)[0]
+                            alt_img_path = path
+                            break
+
+            # Level 10: Demon boss (prefer 'demon_boss' here to make second boss more difficult)
+            if level == 10:
+                for name in ("demon_boss.png", "stark_rewop.png", "alien_boss2.png"):
                     path = os.path.join(BASE_DIR, "objectives", "images", name)
                     if os.path.exists(path):
                         variant_name = name.rsplit('.', 1)[0]
                         alt_img_path = path
                         break
 
-            # Level 10: second boss
-            if level == 10:
-                for name in ("sotrak_rewop.png", "stark_rewop.png", "alien_boss2.png"):
+            # Level 15: Final boss (prefer 'final_boss.png')
+            if level == 15:
+                for name in ("final_boss.png", "demon_boss.png", "alien_boss3.png"):
                     path = os.path.join(BASE_DIR, "objectives", "images", name)
                     if os.path.exists(path):
                         variant_name = name.rsplit('.', 1)[0]
@@ -340,10 +352,26 @@ while running:
             current_boss.max_hp = 500 + (level * 100) 
             current_boss.hp = current_boss.max_hp
 
-            # Make the second boss variant tougher
+            # Make certain boss variants tougher
             if variant_name in ("sotrak_rewop", "stark_rewop"):
+                # very tough variants
                 current_boss.max_hp += 500
                 current_boss.hp = current_boss.max_hp
+            # Level 5 fallback boss (alien_boss) should be a bit tougher than normal
+            if variant_name == "alien_boss":
+                current_boss.max_hp += 300
+                current_boss.hp = current_boss.max_hp
+            # Demon boss: stronger than level-5 variants (level 10 boss)
+            if variant_name == "demon_boss":
+                current_boss.max_hp += 800
+                current_boss.hp = current_boss.max_hp
+                # Make it more aggressive at runtime
+                try:
+                    current_boss.shoot_delay = max(400, current_boss.shoot_delay - 300)
+                    current_boss.speed_x = int(current_boss.speed_x * 1.2)
+                    current_boss.hard_behavior = True
+                except Exception:
+                    pass
 
             enemies.clear()
 
