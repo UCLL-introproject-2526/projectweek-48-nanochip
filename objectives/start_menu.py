@@ -4,6 +4,11 @@ import os
 from objectives import sound 
 import math
 
+
+def _get_desktop_fullscreen_flag():
+    # Use simple fullscreen flag to match previous behavior
+    return pygame.FULLSCREEN
+
 # COLORS
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -31,9 +36,25 @@ def draw_button(screen, rect, text, font, is_hover=False):
     pygame.draw.rect(screen, BUTTON_BG, rect, border_radius=8)
     pygame.draw.rect(screen, color, rect, 3, border_radius=8)
 
-    txt = font.render(text, True, WHITE if is_hover else GRAY)
-    txt_rect = txt.get_rect(center=rect.center)
-    screen.blit(txt, txt_rect)
+    # Try to render text to fit into rect. If too wide, reduce font size until it fits.
+    padding = 16
+    max_w = rect.width - padding
+    # Start from provided font height and decrease if necessary
+    base_size = max(12, font.get_height())
+    chosen_surf = None
+    for size in range(base_size, 11, -1):
+        try_font = pygame.font.SysFont(None, size)
+        txt_w, txt_h = try_font.size(text)
+        if txt_w <= max_w:
+            chosen_surf = try_font.render(text, True, WHITE if is_hover else GRAY)
+            break
+    if chosen_surf is None:
+        # fallback: use the smallest font and allow clipping
+        smallf = pygame.font.SysFont(None, 12)
+        chosen_surf = smallf.render(text, True, WHITE if is_hover else GRAY)
+
+    txt_rect = chosen_surf.get_rect(center=rect.center)
+    screen.blit(chosen_surf, txt_rect)
 
 
 def draw_slider(screen, x, y, width, height, value):
@@ -56,12 +77,13 @@ def start_menu(screen, clock):
 
     # 1. LOAD BACKGROUND
     bg_image = None
+    loaded_menu_bg = None
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         img_path = os.path.join(base_dir, "images", "menu_bg.png") 
         if os.path.exists(img_path):
-            loaded_img = pygame.image.load(img_path).convert()
-            bg_image = pygame.transform.scale(loaded_img, screen.get_size())
+            loaded_menu_bg = pygame.image.load(img_path).convert()
+            bg_image = pygame.transform.scale(loaded_menu_bg, screen.get_size())
     except Exception as e:
         print(f"Error loading menu background: {e}")
 
@@ -70,6 +92,11 @@ def start_menu(screen, clock):
     selected_index = 0
     in_settings = False
     slider_dragging = False
+    # fullscreen state for settings (local toggle)
+    is_fullscreen = False
+
+    # remember initial windowed size so we can restore and center it
+    initial_size = screen.get_size()
 
     # Button rects
     btn_w, btn_h = 320, 56
@@ -131,7 +158,7 @@ def start_menu(screen, clock):
                         if i == 0:
                             try: sound.play_explosion()
                             except Exception: pass
-                            return "start"
+                            return ("start", is_fullscreen)
                         elif i == 1:
                             in_settings = True
                         elif i == 2:
@@ -175,8 +202,14 @@ def start_menu(screen, clock):
             if keys[pygame.K_RIGHT]:
                 sound.set_music_volume(min(1.0, sound.current_volume + 0.01))
 
-            # Back button
-            back_rect = pygame.Rect(btn_x, 500, 180, 44)
+            # Center BACK and FULLSCREEN buttons together at bottom
+            bottom_w = 220
+            spacing = 24
+            total_w = bottom_w * 2 + spacing
+            start_x = screen.get_width() // 2 - total_w // 2
+            back_rect = pygame.Rect(start_x, 500, bottom_w, 44)
+            fs_rect = pygame.Rect(start_x + bottom_w + spacing, 500, bottom_w, 44)
+
             if back_rect.collidepoint(mouse_pos):
                 draw_button(screen, back_rect, "BACK", option_font, is_hover=True)
                 if mouse_pressed[0]:
@@ -184,11 +217,60 @@ def start_menu(screen, clock):
             else:
                 draw_button(screen, back_rect, "BACK", option_font, is_hover=False)
 
+            fs_text = "FULL SCREEN: ON" if is_fullscreen else "FULL SCREEN: OFF"
+            if fs_rect.collidepoint(mouse_pos):
+                draw_button(screen, fs_rect, fs_text, option_font, is_hover=True)
+                if mouse_pressed[0]:
+                    # Toggle fullscreen mode and immediately update local surface + background
+                    is_fullscreen = not is_fullscreen
+                    try:
+                        info = pygame.display.Info()
+                        if is_fullscreen:
+                            flags = _get_desktop_fullscreen_flag()
+                            pygame.display.set_mode((info.current_w, info.current_h), flags)
+                        else:
+                            # restore to the initial windowed size and center
+                            win_w, win_h = initial_size
+                            pos_x = max(0, (info.current_w - win_w) // 2)
+                            pos_y = max(0, (info.current_h - win_h) // 2)
+                            os.environ['SDL_VIDEO_WINDOW_POS'] = f"{pos_x},{pos_y}"
+                            pygame.display.set_mode((win_w, win_h))
+
+                        # update local screen reference and recompute layout
+                        screen = pygame.display.get_surface()
+                        btn_x = screen.get_width() // 2 - btn_w // 2
+                        if loaded_menu_bg is not None:
+                            bg_image = pygame.transform.scale(loaded_menu_bg, screen.get_size())
+                    except Exception:
+                        pass
+            else:
+                draw_button(screen, fs_rect, fs_text, option_font, is_hover=False)
+
             # Allow ESC or Enter to go back
             for event in pygame.event.get():
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
+                    if event.key == pygame.K_RETURN:
                         in_settings = False
+                    elif event.key == pygame.K_ESCAPE:
+                        # If fullscreen active, ESC should restore to mid-screen (windowed centered)
+                        if is_fullscreen:
+                            is_fullscreen = False
+                            try:
+                                info = pygame.display.Info()
+                                flags = _get_desktop_fullscreen_flag()
+                                win_w, win_h = initial_size
+                                pos_x = max(0, (info.current_w - win_w) // 2)
+                                pos_y = max(0, (info.current_h - win_h) // 2)
+                                os.environ['SDL_VIDEO_WINDOW_POS'] = f"{pos_x},{pos_y}"
+                                pygame.display.set_mode((win_w, win_h))
+                                screen = pygame.display.get_surface()
+                                btn_x = screen.get_width() // 2 - btn_w // 2
+                                if loaded_menu_bg is not None:
+                                    bg_image = pygame.transform.scale(loaded_menu_bg, screen.get_size())
+                            except Exception:
+                                pass
+                        else:
+                            in_settings = False
 
         # Keyboard navigation and events (outside settings to avoid interfering with slider loop above)
         for event in pygame.event.get():
@@ -206,7 +288,7 @@ def start_menu(screen, clock):
                         try: sound.play_shoot()
                         except Exception: pass
                     elif event.key == pygame.K_RETURN:
-                        if selected_index == 0: return "start"
+                        if selected_index == 0: return ("start", is_fullscreen)
                         elif selected_index == 1: in_settings = True
                         elif selected_index == 2: pygame.quit(); sys.exit()
                 else:

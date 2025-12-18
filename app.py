@@ -3,6 +3,7 @@ import sys
 import random
 import os
 import math
+import sys
 
 # --------------------
 # INIT
@@ -27,7 +28,7 @@ import objectives.boss as boss_module
 # SOUND INIT
 # --------------------
 sound.init_sound()
-sound.play_background_music()
+
 
 # --------------------
 # DISPLAY
@@ -36,6 +37,8 @@ WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Spaceship Game - Sector 48")
 clock = pygame.time.Clock()
+# remember last known windowed size so ESC can restore/center
+last_windowed_size = (WIDTH, HEIGHT)
 
 # --------------------
 # COLORS & FONT
@@ -112,28 +115,41 @@ game_state = GAME_RUNNING
 screen_shake = 0
 
 # --------------------
-# BACKGROUND & ASSETS
+# BACKGROUND & ASSETS (deferred load to speed startup)
 # --------------------
-bg = Background("spaceship.jpg", WIDTH, HEIGHT)
+bg = None
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
+player_img = None
+enemy_img = None
 player_img_path = os.path.join(BASE_DIR, "objectives", "images", "player_ship.png")
 enemy_img_path = os.path.join(BASE_DIR, "objectives", "images", "enemy_ship.png")
 
-# Load Images (Fallback logic)
-try:
-    player_img = pygame.image.load(player_img_path).convert_alpha()
-    player_img = pygame.transform.scale(player_img, (player_width, player_height))
-except FileNotFoundError:
-    player_img = pygame.Surface((player_width, player_height))
-    player_img.fill((0, 255, 0))
 
-try:
-    enemy_img = pygame.image.load(enemy_img_path).convert_alpha()
-    enemy_img = pygame.transform.scale(enemy_img, (50, 40))
-except FileNotFoundError:
-    enemy_img = pygame.Surface((50, 40))
-    enemy_img.fill((255, 0, 0))
+def get_desktop_fullscreen_flag():
+    # Use the simple FULLSCREEN flag for consistent cross-platform behavior
+    return pygame.FULLSCREEN
+
+
+def is_surface_fullscreen(surf):
+    try:
+        flags = surf.get_flags()
+        if flags & pygame.FULLSCREEN:
+            return True
+        if hasattr(pygame, 'FULLSCREEN_DESKTOP') and (flags & pygame.FULLSCREEN_DESKTOP):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def reduce_player_hp(amount):
+    # Reduce player's HP but if player is at 1 heart (one segment) any hit is fatal
+    global player_hp
+    segment = max(1, player_max_hp // 5)
+    if player_hp <= segment:
+        player_hp = 0
+    else:
+        player_hp = max(0, player_hp - amount)
 
 # --------------------
 # VARIABLES
@@ -234,7 +250,60 @@ def draw_player(x, y):
 # --------------------
 # START MENU
 # --------------------
-action = start_menu.start_menu(screen, clock)
+# start_menu may change display mode (fullscreen). it returns (action, is_fullscreen)
+res = start_menu.start_menu(screen, clock)
+if isinstance(res, tuple) and len(res) == 2:
+    action, is_fullscreen = res
+else:
+    action = res
+    is_fullscreen = False
+
+# refresh display surface and sizes in case mode changed in menu
+screen = pygame.display.get_surface()
+WIDTH, HEIGHT = screen.get_size()
+if not is_fullscreen:
+    last_windowed_size = (WIDTH, HEIGHT)
+    
+# compute scale factor from original design (800x600)
+scale_x = WIDTH / 800.0
+scale_y = HEIGHT / 600.0
+
+# scale player/enemy sizes to fit the new window
+player_width = max(16, int(50 * scale_x))
+player_height = max(12, int(40 * scale_y))
+
+# Load images now if they were deferred
+try:
+    if player_img is None:
+        try:
+            player_img = pygame.image.load(player_img_path).convert_alpha()
+        except Exception:
+            player_img = pygame.Surface((player_width, player_height))
+            player_img.fill((0, 255, 0))
+    if enemy_img is None:
+        try:
+            enemy_img = pygame.image.load(enemy_img_path).convert_alpha()
+        except Exception:
+            enemy_img = pygame.Surface((50, 40))
+            enemy_img.fill((255, 0, 0))
+except Exception:
+    pass
+
+try:
+    # rescale player image to new size
+    player_img = pygame.transform.scale(player_img, (player_width, player_height))
+except Exception:
+    pass
+try:
+    enemy_w = max(16, int(50 * scale_x))
+    enemy_h = max(12, int(40 * scale_y))
+    enemy_img = pygame.transform.scale(enemy_img, (enemy_w, enemy_h))
+except Exception:
+    pass
+
+# recreate background to match new size
+bg = Background("spaceship.jpg", WIDTH, HEIGHT)
+
 if action == "start":
     reset_game()
 elif action == "quit":
@@ -256,6 +325,77 @@ while running:
             sys.exit()
 
         if event.type == pygame.KEYDOWN:
+            # ESC should restore or center window (mid-screen)
+            if event.key == pygame.K_ESCAPE:
+                try:
+                    info = pygame.display.Info()
+                    surf = pygame.display.get_surface()
+                    # if fullscreen -> restore to last windowed size, else keep current
+                    if is_surface_fullscreen(surf):
+                        win_w, win_h = last_windowed_size
+                    else:
+                        win_w, win_h = surf.get_size()
+
+                    pos_x = max(0, (info.current_w - win_w) // 2)
+                    pos_y = max(0, (info.current_h - win_h) // 2)
+                    os.environ['SDL_VIDEO_WINDOW_POS'] = f"{pos_x},{pos_y}"
+                    pygame.display.set_mode((win_w, win_h))
+                    # refresh surfaces and sizes
+                    screen = pygame.display.get_surface()
+                    WIDTH, HEIGHT = screen.get_size()
+                    # update last windowed size
+                    last_windowed_size = (WIDTH, HEIGHT)
+                    try:
+                        bg = Background("spaceship.jpg", WIDTH, HEIGHT)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+                continue
+            # FULLSCREEN TOGGLE (F key)
+            if event.key == pygame.K_f:
+                try:
+                    info = pygame.display.Info()
+                    surf = pygame.display.get_surface()
+                    # If currently fullscreen -> restore to last windowed size
+                    if is_surface_fullscreen(surf):
+                        win_w, win_h = last_windowed_size
+                        pos_x = max(0, (info.current_w - win_w) // 2)
+                        pos_y = max(0, (info.current_h - win_h) // 2)
+                        os.environ['SDL_VIDEO_WINDOW_POS'] = f"{pos_x},{pos_y}"
+                        pygame.display.set_mode((win_w, win_h))
+                    else:
+                        # store current windowed size then go fullscreen using desktop flag where available
+                        last_windowed_size = surf.get_size()
+                        flags = get_desktop_fullscreen_flag()
+                        pygame.display.set_mode((info.current_w, info.current_h), flags)
+
+                    # refresh surface and sizes
+                    screen = pygame.display.get_surface()
+                    WIDTH, HEIGHT = screen.get_size()
+
+                    # rescale assets to new size
+                    scale_x = WIDTH / 800.0
+                    scale_y = HEIGHT / 600.0
+                    player_width = max(16, int(50 * scale_x))
+                    player_height = max(12, int(40 * scale_y))
+                    try:
+                        player_img = pygame.transform.scale(player_img, (player_width, player_height))
+                    except Exception:
+                        pass
+                    try:
+                        enemy_w = max(16, int(50 * scale_x))
+                        enemy_h = max(12, int(40 * scale_y))
+                        enemy_img = pygame.transform.scale(enemy_img, (enemy_w, enemy_h))
+                    except Exception:
+                        pass
+                    try:
+                        bg = Background("spaceship.jpg", WIDTH, HEIGHT)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+                continue
             # PAUSE TOGGLE
             if event.key == pygame.K_p:
                 if game_state == GAME_RUNNING:
@@ -305,12 +445,20 @@ while running:
         shake_x = random.randint(-5, 5)
         shake_y = random.randint(-5, 5)
 
+    # Draw/update parallax background first
+    try:
+        if bg:
+            bg.update()
+            bg.draw(screen)
+    except Exception:
+        # fallback: clear screen
+        screen.fill((0, 0, 0))
+
     # 5. LEVEL UP LOGIC
     if score >= next_level_score and current_boss is None:
+        # If the next level is a boss level, prepare and spawn a boss
         if (level + 1) in [5, 10, 15, 20]:
             level += 1
-            # SPAWN BOSS
-            # Determine variant image for special bosses
             variant_name = None
             alt_img_path = None
 
@@ -373,6 +521,30 @@ while running:
                 except Exception:
                     pass
 
+            # Tweak difficulty per boss level:
+            # Reduce life for the first boss (level 5) so the fight is shorter
+            if level == 5:
+                try:
+                    # Reduce HP to ~60% of assigned max for a quicker first boss
+                    current_boss.max_hp = max(300, int(current_boss.max_hp * 0.6))
+                    current_boss.hp = current_boss.max_hp
+                except Exception:
+                    pass
+
+            # Make the second boss (level 10) noticeably harder
+            if level == 10:
+                try:
+                    # Increase HP substantially and make attacks faster/denser
+                    current_boss.max_hp += 1200
+                    current_boss.hp = current_boss.max_hp
+                    # boost horizontal speed
+                    current_boss.speed_x = abs(getattr(current_boss, 'speed_x', 3)) + 2
+                    # reduce shoot delay and mark as hard behavior
+                    current_boss.shoot_delay = max(250, int(getattr(current_boss, 'shoot_delay', 1000) * 0.6))
+                    current_boss.hard_behavior = True
+                except Exception:
+                    pass
+
             enemies.clear()
 
             # Apply variant image if found
@@ -380,7 +552,6 @@ while running:
                 if alt_img_path:
                     loaded_img = pygame.image.load(alt_img_path).convert_alpha()
                     current_boss.image = pygame.transform.scale(loaded_img, (current_boss.width, current_boss.height))
-                    # Preserve center position
                     cx = current_boss.rect.centerx
                     cy = current_boss.rect.centery
                     current_boss.rect = current_boss.image.get_rect()
@@ -397,16 +568,18 @@ while running:
             except Exception as e:
                 print(f"Warning: Could not set boss variant image: {e}")
 
-            # Cinematic intro setup
             boss_intro = True
             boss_intro_start = pygame.time.get_ticks()
             current_boss.rect.y = -current_boss.rect.height
             sound.stop_background_music()
             sound.play_explosion()
             screen_shake = 10
+            # prevent immediate further level-ups while boss fight occurs
+            next_level_score = score + 150
         else:
             level += 1
-            next_level_score = level * 150
+            # ensure we don't immediately trigger multiple level-ups when score jumps
+            next_level_score = score + 150
             spawn_rate = max(10, 40 - level)
             print(f"LEVEL UP! Welcome to Level {level}")
 
@@ -432,8 +605,19 @@ while running:
         player_x += current_speed
         if player_x > WIDTH: player_x = -player_width
 
-    # DRAW BACKGROUND
-    screen.blit(bg.image, (shake_x, shake_y))
+    # Allow vertical movement with UP/DOWN arrows; constrain vertically inside screen
+    if keys[pygame.K_UP]:
+        player_y -= current_speed
+    if keys[pygame.K_DOWN]:
+        player_y += current_speed
+
+    # Constrain vertical position so player stays on screen
+    if player_y < 0:
+        player_y = 0
+    if player_y + player_height > HEIGHT:
+        player_y = HEIGHT - player_height
+
+    # Background is drawn earlier via bg.update()/bg.draw(); nothing to do here
 
     # UPDATE PLAYER BULLETS
     for b_data in bullets[:]:
@@ -516,7 +700,7 @@ while running:
                 bullet.kill()
                 if not shield_active:
                     if current_time - last_hit_time > base_invincible_duration:
-                        player_hp -= 15
+                        reduce_player_hp(15)
                         last_hit_time = current_time
                         sound.play_explosion()
 
@@ -548,7 +732,7 @@ while running:
         if current_boss and player_rect.colliderect(current_boss.rect):
             if not shield_active:
                 if current_time - last_hit_time > base_invincible_duration:
-                     player_hp -= 30 
+                     reduce_player_hp(30)
                      last_hit_time = current_time
                      sound.play_explosion()
 
@@ -603,7 +787,7 @@ while running:
                     sound.play_explosion()
                 else:
                     if current_time - last_hit_time > base_invincible_duration:
-                        player_hp -= damage_per_hit
+                        reduce_player_hp(damage_per_hit)
                         last_hit_time = current_time
                         explosions.append(Explosion(enemy.x + 25, enemy.y + 20))
                         enemies.remove(enemy)
