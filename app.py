@@ -60,8 +60,34 @@ base_invincible_duration = 1000
 
 # Enemy Defaults
 base_enemy_speed = 3
-spawn_rate = 40 
+spawn_rate = 40
 BOSS_TARGET_Y = 70  # Y position where boss settles after intro
+
+# --------------------
+# HIGH SCORE SYSTEM
+# --------------------
+HIGHSCORE_FILE = "highscore.txt"
+
+def load_high_score():
+    """Loads the high score from a file, returns 0 if file doesn't exist."""
+    if os.path.exists(HIGHSCORE_FILE):
+        try:
+            with open(HIGHSCORE_FILE, "r") as f:
+                return int(f.read())
+        except:
+            return 0
+    return 0
+
+def save_high_score(new_best):
+    """Saves the new high score to the file."""
+    try:
+        with open(HIGHSCORE_FILE, "w") as f:
+            f.write(str(new_best))
+    except:
+        print("Could not save high score.")
+
+# Initialize High Score
+high_score = load_high_score()
 
 # --------------------
 # GAME LISTS
@@ -141,11 +167,15 @@ boss_bar_height = 80
 # RESET GAME
 # --------------------
 def reset_game():
-    global player_x, player_y, player_hp, player_lives
+    global player_x, player_y, player_hp, player_lives0
     global bullets, enemies, explosions, powerups
     global score, spawn_timer, last_hit_time, game_state
     global rapid_fire_active, shield_active, shield_angle
     global level, next_level_score, current_boss, spawn_rate, screen_shake
+    global high_score, boss_intro, boss_intro_start, boss_bar_height
+
+    # Reload high score
+    high_score = load_high_score()
 
     player_x = WIDTH // 2 - player_width // 2
     player_y = HEIGHT - 70
@@ -171,9 +201,14 @@ def reset_game():
     next_level_score = 150
     current_boss = None
     spawn_rate = 40
+<<<<<<< HEAD
+    
+=======
+   
+>>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
+    # Reset Boss Intro vars
     boss_intro = False
     boss_intro_start = 0
-    boss_intro_duration = 2000    # ms
     boss_bar_height = 80
 
     sound.play_background_music()
@@ -254,13 +289,18 @@ while running:
         pygame.display.flip()
         continue # Skip the rest of the loop while paused
 
-    # 3. GAME OVER LOGIC
+    # 3. GAME OVER LOGIC (Updated with Scores)
     if game_state == GAME_OVER:
-        action = game_over_screen(screen, clock)
+        # Check and Save High Score
+        if score > high_score:
+            high_score = score
+            save_high_score(high_score)
+
+        # Call the new game_over_screen with score arguments
+        action = game_over_screen(screen, clock, score, high_score)
         if action == "restart":
             reset_game()
         continue
-    # here we go
 
     # 4. CALCULATE SHAKE OFFSET
     shake_x, shake_y = 0, 0
@@ -274,11 +314,11 @@ while running:
         if (level + 1) in [5, 10, 15, 20]:
             level += 1
             # SPAWN BOSS
-            # Determine variant image for special bosses (prefer specific filenames if present)
+            # Determine variant image for special bosses
             variant_name = None
             alt_img_path = None
 
-            # Level 5: first boss - prefer 'alien_bosss.png' then fallback to 'alien_boss.png'
+            # Level 5: first boss
             if level == 5:
                 for name in ("alien_bosss.png", "alien_boss.png"):
                     path = os.path.join(BASE_DIR, "objectives", "images", name)
@@ -287,27 +327,78 @@ while running:
                         alt_img_path = path
                         break
 
-            # Level 10: second boss - prefer custom rewop images, then alien_boss2.png
+<<<<<<< HEAD
+            # Level 10: second boss
+=======
+<<<<<<< HEAD
+            # Level 10: second boss
+=======
+            # Level 10: second boss - prefer demon_boss.png first, then custom rewop images, then alien_boss2.png
+>>>>>>> 3b8984005f7f2116d654f6572d65717acd122968
+>>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
             if level == 10:
-                for name in ("sotrak_rewop.png", "stark_rewop.png", "alien_boss2.png"):
-                    path = os.path.join(BASE_DIR, "objectives", "images", name)
-                    if os.path.exists(path):
-                        variant_name = name.rsplit('.', 1)[0]
-                        alt_img_path = path
-                        break
+                # Prefer a specific demon boss image if present
+                demon_path = os.path.join(BASE_DIR, "objectives", "images", "demon_boss.png")
+                if os.path.exists(demon_path):
+                    variant_name = "demon_boss"
+                    alt_img_path = demon_path
+                else:
+                    for name in ("sotrak_rewop.png", "stark_rewop.png", "alien_boss2.png"):
+                        path = os.path.join(BASE_DIR, "objectives", "images", name)
+                        if os.path.exists(path):
+                            variant_name = name.rsplit('.', 1)[0]
+                            alt_img_path = path
+                            break
 
             current_boss = boss_module.Boss(WIDTH, HEIGHT, BOSS_TARGET_Y, variant=variant_name)
-            current_boss.max_hp = 500 + (level * 100) 
+            current_boss.max_hp = 500 + (level * 100)
             current_boss.hp = current_boss.max_hp
 
-            # Make the second boss variant tougher
-            if variant_name in ("sotrak_rewop", "stark_rewop"):
-                current_boss.max_hp += 500
+            # Tone down Level 10 difficulty moderately
+            if level == 10:
+                # Moderate HP bump (smaller than before)
+                current_boss.max_hp += 200
                 current_boss.hp = current_boss.max_hp
+                # Slightly increase speed (was +2, now +1)
+                current_boss.speed_x = abs(current_boss.speed_x) + 1
+                # Make shooting less aggressive (longer shoot delay than before)
+                current_boss.shoot_delay = min(getattr(current_boss, 'shoot_delay', 1000) + 150, 800)
+                # Keep hard behavior flag enabled but boss is nerfed
+                setattr(current_boss, 'hard_behavior', True)
 
-            enemies.clear()
+            # Make the first boss a bit tougher: slightly more HP, faster movement and quicker shots
+            if level == 5 and variant_name is None:
+                current_boss.max_hp += 150
+                current_boss.hp = current_boss.max_hp
+                # Increase horizontal speed slightly (more aggressive movement)
+                current_boss.speed_x = abs(current_boss.speed_x) + 1
+                # Lower shoot delay so boss fires a bit more often (ms)
+                current_boss.shoot_delay = max(350, current_boss.shoot_delay - 300)
+                # Set a slightly lower settling position so the boss sits a bit down
+                current_boss.target_y = BOSS_TARGET_Y + 12
 
+<<<<<<< HEAD
+            # Apply variant image if found
+=======
+<<<<<<< HEAD
+            # Apply variant image if found
+=======
+            # Keep both the first and second bosses at a similar, slightly larger size
+            # (fixes the earlier disproportionate second-boss scaling)
+            if level in (5, 10):
+                # Level 5: slightly larger than default
+                if level == 5:
+                    current_boss.width = 120
+                    current_boss.height = 96
+                    current_boss.target_y = getattr(current_boss, 'target_y', BOSS_TARGET_Y + 12)
+                else:
+                    # Level 10: a bit bigger than Level 5
+                    current_boss.width = 140
+                    current_boss.height = 112
+                    current_boss.target_y = BOSS_TARGET_Y + 20
             # Boss variant: use a different image if one was found
+>>>>>>> 3b8984005f7f2116d654f6572d65717acd122968
+>>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
             try:
                 if alt_img_path:
                     loaded_img = pygame.image.load(alt_img_path).convert_alpha()
@@ -319,11 +410,25 @@ while running:
                     current_boss.rect.centerx = cx
                     current_boss.rect.centery = cy
                 else:
-                    # Fallback: tint the default boss image to make it look different
+<<<<<<< HEAD
+                    # Fallback tint
+=======
+<<<<<<< HEAD
+                    # Fallback tint
+=======
+                    # Fallback: scale and tint the default boss image to make it look different
+>>>>>>> 3b8984005f7f2116d654f6572d65717acd122968
+>>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
                     try:
-                        tinted = current_boss.image.copy()
-                        tinted.fill((0, 100, 180, 0), special_flags=pygame.BLEND_RGBA_MULT)
-                        current_boss.image = tinted
+                        scaled = pygame.transform.scale(current_boss.image.copy(), (current_boss.width, current_boss.height))
+                        scaled.fill((0, 100, 180, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                        current_boss.image = scaled
+                        # Preserve center position
+                        cx = current_boss.rect.centerx
+                        cy = current_boss.rect.centery
+                        current_boss.rect = current_boss.image.get_rect()
+                        current_boss.rect.centerx = cx
+                        current_boss.rect.centery = cy
                     except Exception:
                         pass
             except Exception as e:
@@ -332,9 +437,7 @@ while running:
             # Cinematic intro setup
             boss_intro = True
             boss_intro_start = pygame.time.get_ticks()
-            # start boss offscreen for a slide-in
             current_boss.rect.y = -current_boss.rect.height
-            # dramatic audio/visuals
             sound.stop_background_music()
             sound.play_explosion()
             screen_shake = 10
@@ -347,7 +450,7 @@ while running:
     # TIMERS
     if rapid_fire_active and current_time > rapid_fire_end_time:
         rapid_fire_active = False
-    
+   
     if shield_active:
         if current_time > shield_end_time:
             shield_active = False
@@ -358,7 +461,7 @@ while running:
     # MOVEMENT
     keys = pygame.key.get_pressed()
     current_speed = player_speed + 2 if rapid_fire_active else player_speed
-    
+   
     if keys[pygame.K_LEFT]:
         player_x -= current_speed
         if player_x + player_width < 0: player_x = WIDTH
@@ -366,7 +469,7 @@ while running:
         player_x += current_speed
         if player_x > WIDTH: player_x = -player_width
 
-    # DRAW BACKGROUND (Apply Shake)
+    # DRAW BACKGROUND
     screen.blit(bg.image, (shake_x, shake_y))
 
     # UPDATE PLAYER BULLETS
@@ -382,10 +485,10 @@ while running:
     # ---------------------------
     if current_boss is None:
         spawn_timer += 1
-        if spawn_timer > spawn_rate: 
+        if spawn_timer > spawn_rate:
             smarter_enemies.spawn_enemy(enemies, WIDTH, 50, 40)
             spawn_timer = 0
-            
+           
         current_enemy_speed = base_enemy_speed + (level * 0.2)
         score = smarter_enemies.update_enemies(
             enemies=enemies,
@@ -402,13 +505,19 @@ while running:
     else:
         # BOSS LOGIC
         if boss_intro:
+            # Ensure any remaining enemies are cleared when the boss intro starts
+            # so they don't linger frozen on screen during the boss fight.
+            if enemies:
+                enemies.clear()
+                spawn_timer = 0
+
             elapsed = pygame.time.get_ticks() - boss_intro_start
             t = min(1.0, elapsed / boss_intro_duration)
 
-            # ease-in motion
+            # ease-in motion (honors per-boss target if set)
             ease = t * t
             start_y = -current_boss.rect.height
-            target_y = BOSS_TARGET_Y
+            target_y = getattr(current_boss, 'target_y', BOSS_TARGET_Y)
             current_boss.rect.y = int(start_y + (target_y - start_y) * ease)
 
             # letterbox bars
@@ -416,34 +525,34 @@ while running:
             pygame.draw.rect(screen, (0, 0, 0), (0, 0, WIDTH, bar_h))
             pygame.draw.rect(screen, (0, 0, 0), (0, HEIGHT - bar_h, WIDTH, bar_h))
 
-            # dark overlay for drama
+            # dark overlay
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, int(120 * t)))
             screen.blit(overlay, (0, 0))
 
-            # blinking warning text
+            # blinking warning
             if (elapsed // 300) % 2 == 0:
                 warn = big_font.render("BOSS INCOMING", True, (255, 40, 40))
                 screen.blit(warn, (WIDTH // 2 - warn.get_width() // 2, HEIGHT // 2 - 20))
 
-            # small particle burst once at start
             if elapsed < 50:
                 explosions.append(Explosion(WIDTH // 2, 60))
 
-            # finish intro
             if elapsed >= boss_intro_duration:
                 boss_intro = False
-                screen_shake = 6  # small aftermath shake
+<<<<<<< HEAD
+                screen_shake = 6 
+=======
+                screen_shake = 6
+>>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
                 sound.play_background_music()
 
-            # draw boss with a little jitter while intro plays
+            # jitter boss during intro
             screen.blit(current_boss.image, (current_boss.rect.x + random.randint(-2, 2), current_boss.rect.y + random.randint(-2, 2)))
         else:
-            # normal boss update/draw
+            # normal boss update
             current_boss.update()
-            # Draw Boss with Shake
             screen.blit(current_boss.image, (current_boss.rect.x + shake_x, current_boss.rect.y + shake_y))
-
             current_boss.bullets.update()
             current_boss.bullets.draw(screen)
 
@@ -465,49 +574,67 @@ while running:
                 current_boss.hp -= 10
                 explosions.append(Explosion(rect.x, rect.y))
                 bullets.remove(b_data)
-                
+               
                 # BOSS DEATH
                 if current_boss.hp <= 0:
-                    score += 500 
-                    next_level_score = score + 150 
+                    score += 500
+                    next_level_score = score + 150
                     sound.play_explosion()
-                    
-                    # TRIGGER SHAKE
+<<<<<<< HEAD
                     screen_shake = 30 
                     
-                    # Spawn Rewards
+=======
+                    screen_shake = 30
+                   
+>>>>>>> 7900f8041c41ac52e15b6f320c8a7dedec016571
                     try:
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx, current_boss.rect.centery)
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + 40, current_boss.rect.centery)
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx - 40, current_boss.rect.centery)
                     except AttributeError:
                         pass
-                    current_boss = None 
+                    current_boss = None
                 break
-        
+       
         # Check collision: Player vs Boss Body
         if current_boss and player_rect.colliderect(current_boss.rect):
             if not shield_active:
                 if current_time - last_hit_time > base_invincible_duration:
-                     player_hp -= 30 
+                     player_hp -= 30
                      last_hit_time = current_time
                      sound.play_explosion()
 
         # Random Powerup Drop during Boss Fight
-        if random.randint(1, 100) <= 2:
-             drop_x = random.randint(50, WIDTH - 50)
-             try:
-                 powerups_module.spawn_powerup_at(powerups, drop_x, -50)
-             except AttributeError:
-                 pass
+        if current_boss:
+            # Increase random drop chance during second boss variants
+            # Lowered to reduce generosity
+            drop_chance = 4 if current_boss.variant in ("sotrak_rewop", "stark_rewop") else 2
+            if random.randint(1, 100) <= drop_chance:
+                drop_x = random.randint(50, WIDTH - 50)
+                try:
+                    powerups_module.spawn_powerup_at(powerups, drop_x, -50)
+                except AttributeError:
+                    pass
+
+            # Guaranteed drops at HP thresholds for the second boss (50%, 25%)
+            # Removed the 75% drop to make the fight less generous
+            if current_boss.variant in ("sotrak_rewop", "stark_rewop"):
+                hp_pct = current_boss.hp / max(1, current_boss.max_hp)
+                for t in (0.5, 0.25):
+                    if hp_pct <= t and t not in getattr(current_boss, 'powerup_thresholds_spawned', set()):
+                        try:
+                            # Spawn near the boss so it feels like a boss drop
+                            powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + random.randint(-40, 40), current_boss.rect.bottom + 10)
+                        except AttributeError:
+                            pass
+                        current_boss.powerup_thresholds_spawned.add(t)
 
     # POWERUPS
     for p in powerups[:]:
         p.update()
         p.draw(screen)
-        
+       
         player_rect = pygame.Rect(player_x, player_y, player_width, player_height)
-        # Start pickup animation on collision (don't apply instantly)
         if not getattr(p, 'picked', False) and player_rect.colliderect(p.rect):
             p.start_pickup()
             try:
@@ -515,10 +642,10 @@ while running:
             except Exception:
                 pass
 
-        # If pickup finished, apply effect and remove
         if getattr(p, 'done', False):
             if p.type == powerups_module.EXTRA_LIFE:
-                if player_lives < 5: player_lives += 1
+                # Restore health by one heart (one segment = 20 HP)
+                player_hp = min(player_max_hp, player_hp + 20)
             elif p.type == powerups_module.RAPID_FIRE:
                 rapid_fire_active = True
                 rapid_fire_end_time = current_time + 5000
@@ -552,11 +679,9 @@ while running:
 
     # CHECK DEATH: Game Over when HP reaches zero
     if player_hp <= 0:
-        # Immediately end the game when all heart HP is depleted
         sound.stop_background_music()
         sound.play_game_over()
         game_state = GAME_OVER
-        # If a boss fight was active, ensure boss is placed correctly when restarting later
         if current_boss:
             current_boss.rect.centerx = WIDTH // 2
             current_boss.rect.y = BOSS_TARGET_Y
@@ -573,7 +698,6 @@ while running:
     # DRAW BULLETS
     for b_data in bullets:
         rect = b_data[0]
-        # Create a temp rect for drawing with shake offset
         draw_rect = rect.move(shake_x, shake_y)
         b_color = (255, 255, 0) if rapid_fire_active else WHITE
         pygame.draw.rect(screen, b_color, draw_rect)
@@ -597,9 +721,8 @@ while running:
 
     level_text = font.render(f"LEVEL {level}", True, CYAN)
     screen.blit(level_text, (WIDTH // 2 - 50, 10))
-    
+   
     if current_boss:
-        # Draw Boss HP Bar centered near top
         bar_width = 400
         bar_x = WIDTH // 2 - bar_width // 2
         bar_y = 40
@@ -611,7 +734,7 @@ while running:
     if rapid_fire_active:
         rf_text = font.render("RAPID FIRE!", True, CYAN)
         screen.blit(rf_text, (WIDTH//2 - 60, HEIGHT - 40))
-        
+       
     if shield_active:
         sh_text = font.render("SHIELD ACTIVE", True, (255, 255, 0))
         y_pos = HEIGHT - 70 if rapid_fire_active else HEIGHT - 40
@@ -619,4 +742,4 @@ while running:
 
     pygame.display.flip()
 
-pygame.quit()
+pygame.quit()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
