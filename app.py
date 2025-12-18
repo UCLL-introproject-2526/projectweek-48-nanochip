@@ -141,7 +141,7 @@ boss_bar_height = 80
 # RESET GAME
 # --------------------
 def reset_game():
-    global player_x, player_y, player_hp, player_lives
+    global player_x, player_y, player_hp, player_lives0
     global bullets, enemies, explosions, powerups
     global score, spawn_timer, last_hit_time, game_state
     global rapid_fire_active, shield_active, shield_angle
@@ -287,26 +287,60 @@ while running:
                         alt_img_path = path
                         break
 
-            # Level 10: second boss - prefer custom rewop images, then alien_boss2.png
+            # Level 10: second boss - prefer demon_boss.png first, then custom rewop images, then alien_boss2.png
             if level == 10:
-                for name in ("sotrak_rewop.png", "stark_rewop.png", "alien_boss2.png"):
-                    path = os.path.join(BASE_DIR, "objectives", "images", name)
-                    if os.path.exists(path):
-                        variant_name = name.rsplit('.', 1)[0]
-                        alt_img_path = path
-                        break
+                # Prefer a specific demon boss image if present
+                demon_path = os.path.join(BASE_DIR, "objectives", "images", "demon_boss.png")
+                if os.path.exists(demon_path):
+                    variant_name = "demon_boss"
+                    alt_img_path = demon_path
+                else:
+                    for name in ("sotrak_rewop.png", "stark_rewop.png", "alien_boss2.png"):
+                        path = os.path.join(BASE_DIR, "objectives", "images", name)
+                        if os.path.exists(path):
+                            variant_name = name.rsplit('.', 1)[0]
+                            alt_img_path = path
+                            break
 
             current_boss = boss_module.Boss(WIDTH, HEIGHT, BOSS_TARGET_Y, variant=variant_name)
             current_boss.max_hp = 500 + (level * 100) 
             current_boss.hp = current_boss.max_hp
 
-            # Make the second boss variant tougher
-            if variant_name in ("sotrak_rewop", "stark_rewop"):
-                current_boss.max_hp += 500
+            # Extra difficulty tuning for the second boss (Level 10)
+            if level == 10:
+                # Increase HP and aggressiveness
+                current_boss.max_hp += 400
                 current_boss.hp = current_boss.max_hp
+                current_boss.speed_x = abs(current_boss.speed_x) + 2
+                # Reduce shoot delay so boss fires more often
+                current_boss.shoot_delay = max(300, getattr(current_boss, 'shoot_delay', 1000) - 300)
+                # Ensure the harder behavior flag is set on the boss
+                setattr(current_boss, 'hard_behavior', True)
 
-            enemies.clear()
+            # Make the first boss a bit tougher: slightly more HP, faster movement and quicker shots
+            if level == 5 and variant_name is None:
+                current_boss.max_hp += 150
+                current_boss.hp = current_boss.max_hp
+                # Increase horizontal speed slightly (more aggressive movement)
+                current_boss.speed_x = abs(current_boss.speed_x) + 1
+                # Lower shoot delay so boss fires a bit more often (ms)
+                current_boss.shoot_delay = max(350, current_boss.shoot_delay - 300)
+                # Set a slightly lower settling position so the boss sits a bit down
+                current_boss.target_y = BOSS_TARGET_Y + 12
 
+            # Keep both the first and second bosses at a similar, slightly larger size
+            # (fixes the earlier disproportionate second-boss scaling)
+            if level in (5, 10):
+                # Level 5: slightly larger than default
+                if level == 5:
+                    current_boss.width = 120
+                    current_boss.height = 96
+                    current_boss.target_y = getattr(current_boss, 'target_y', BOSS_TARGET_Y + 12)
+                else:
+                    # Level 10: a bit bigger than Level 5
+                    current_boss.width = 140
+                    current_boss.height = 112
+                    current_boss.target_y = BOSS_TARGET_Y + 20
             # Boss variant: use a different image if one was found
             try:
                 if alt_img_path:
@@ -319,11 +353,17 @@ while running:
                     current_boss.rect.centerx = cx
                     current_boss.rect.centery = cy
                 else:
-                    # Fallback: tint the default boss image to make it look different
+                    # Fallback: scale and tint the default boss image to make it look different
                     try:
-                        tinted = current_boss.image.copy()
-                        tinted.fill((0, 100, 180, 0), special_flags=pygame.BLEND_RGBA_MULT)
-                        current_boss.image = tinted
+                        scaled = pygame.transform.scale(current_boss.image.copy(), (current_boss.width, current_boss.height))
+                        scaled.fill((0, 100, 180, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                        current_boss.image = scaled
+                        # Preserve center position
+                        cx = current_boss.rect.centerx
+                        cy = current_boss.rect.centery
+                        current_boss.rect = current_boss.image.get_rect()
+                        current_boss.rect.centerx = cx
+                        current_boss.rect.centery = cy
                     except Exception:
                         pass
             except Exception as e:
@@ -402,13 +442,19 @@ while running:
     else:
         # BOSS LOGIC
         if boss_intro:
+            # Ensure any remaining enemies are cleared when the boss intro starts
+            # so they don't linger frozen on screen during the boss fight.
+            if enemies:
+                enemies.clear()
+                spawn_timer = 0
+
             elapsed = pygame.time.get_ticks() - boss_intro_start
             t = min(1.0, elapsed / boss_intro_duration)
 
-            # ease-in motion
+            # ease-in motion (honors per-boss target if set)
             ease = t * t
             start_y = -current_boss.rect.height
-            target_y = BOSS_TARGET_Y
+            target_y = getattr(current_boss, 'target_y', BOSS_TARGET_Y)
             current_boss.rect.y = int(start_y + (target_y - start_y) * ease)
 
             # letterbox bars
@@ -494,12 +540,29 @@ while running:
                      sound.play_explosion()
 
         # Random Powerup Drop during Boss Fight
-        if random.randint(1, 100) <= 2:
-             drop_x = random.randint(50, WIDTH - 50)
-             try:
-                 powerups_module.spawn_powerup_at(powerups, drop_x, -50)
-             except AttributeError:
-                 pass
+        if current_boss:
+            # Increase random drop chance during second boss variants
+            # Lowered to reduce generosity
+            drop_chance = 4 if current_boss.variant in ("sotrak_rewop", "stark_rewop") else 2
+            if random.randint(1, 100) <= drop_chance:
+                drop_x = random.randint(50, WIDTH - 50)
+                try:
+                    powerups_module.spawn_powerup_at(powerups, drop_x, -50)
+                except AttributeError:
+                    pass
+
+            # Guaranteed drops at HP thresholds for the second boss (50%, 25%)
+            # Removed the 75% drop to make the fight less generous
+            if current_boss.variant in ("sotrak_rewop", "stark_rewop"):
+                hp_pct = current_boss.hp / max(1, current_boss.max_hp)
+                for t in (0.5, 0.25):
+                    if hp_pct <= t and t not in getattr(current_boss, 'powerup_thresholds_spawned', set()):
+                        try:
+                            # Spawn near the boss so it feels like a boss drop
+                            powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + random.randint(-40, 40), current_boss.rect.bottom + 10)
+                        except AttributeError:
+                            pass
+                        current_boss.powerup_thresholds_spawned.add(t)
 
     # POWERUPS
     for p in powerups[:]:
@@ -518,7 +581,8 @@ while running:
         # If pickup finished, apply effect and remove
         if getattr(p, 'done', False):
             if p.type == powerups_module.EXTRA_LIFE:
-                if player_lives < 5: player_lives += 1
+                # Restore health by one heart (one segment = 20 HP)
+                player_hp = min(player_max_hp, player_hp + 20)
             elif p.type == powerups_module.RAPID_FIRE:
                 rapid_fire_active = True
                 rapid_fire_end_time = current_time + 5000
