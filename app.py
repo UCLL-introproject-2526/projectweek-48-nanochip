@@ -18,7 +18,7 @@ from objectives import sound
 from objectives.background import Background
 from objectives import health
 import objectives.Smarter_enemies as smarter_enemies
-from objectives.game_over import game_over_screen
+from objectives.game_over import game_over_screen, victory_screen
 from objectives import start_menu
 from objectives.explosion import Explosion
 import objectives.powerup as powerups_module
@@ -172,6 +172,7 @@ shield_angle = 0
 level = 1
 next_level_score = 150
 current_boss = None
+game_won = False
 
 # BOSS INTRO / CINEMATIC
 boss_intro = False
@@ -189,6 +190,7 @@ def reset_game():
     global rapid_fire_active, shield_active, shield_angle
     global level, next_level_score, current_boss, spawn_rate, screen_shake
     global high_score, boss_intro, boss_intro_start, boss_bar_height
+    global game_won
 
     # Reload high score
     high_score = load_high_score()
@@ -217,6 +219,8 @@ def reset_game():
     next_level_score = 150
     current_boss = None
     spawn_rate = 40
+    # victory flag
+    game_won = False
     
     # Reset Boss Intro vars
     boss_intro = False
@@ -396,6 +400,52 @@ while running:
                 except Exception:
                     pass
                 continue
+            # Developer shortcut: skip to level 15 (key 3)
+            if event.key == pygame.K_3:
+                try:
+                    # Force next loop to treat as leveling up into level 15 boss
+                    level = 14
+                    # make score meet threshold so level-up logic runs immediately
+                    score = next_level_score
+                    enemies.clear()
+                    spawn_timer = 0
+                    current_boss = None
+                    print("Developer shortcut: skipping to level 15")
+                except Exception:
+                    pass
+            # Developer shortcut: kill current boss instantly (key 6)
+            if event.key == pygame.K_6:
+                try:
+                    if current_boss is not None:
+                        # create big explosion(s) at boss location
+                        try:
+                            explosions.append(Explosion(current_boss.rect.centerx, current_boss.rect.centery))
+                        except Exception:
+                            pass
+                        # award score and effects similar to boss death
+                        score += 500
+                        next_level_score = score + 150
+                        sound.play_explosion()
+                        screen_shake = 30
+                        # spawn a few powerups where the boss was
+                        try:
+                            powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx, current_boss.rect.centery)
+                            powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx + 40, current_boss.rect.centery)
+                            powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx - 40, current_boss.rect.centery)
+                        except Exception:
+                            pass
+                        # If this was the final boss, mark victory
+                        was_final = (level >= 15)
+                        current_boss = None
+                        if was_final:
+                            try:
+                                sound.stop_background_music()
+                            except Exception:
+                                pass
+                            game_state = GAME_OVER
+                            game_won = True
+                except Exception:
+                    pass
             # PAUSE TOGGLE
             if event.key == pygame.K_p:
                 if game_state == GAME_RUNNING:
@@ -431,9 +481,11 @@ while running:
         if score > high_score:
             high_score = score
             save_high_score(high_score)
-
-        # Call the new game_over_screen with score arguments
-        action = game_over_screen(screen, clock, score, high_score)
+        # Call victory or game over screen depending on outcome
+        if game_won:
+            action = victory_screen(screen, clock, score, high_score)
+        else:
+            action = game_over_screen(screen, clock, score, high_score)
         if action == "restart":
             reset_game()
         continue
@@ -689,7 +741,7 @@ while running:
         else:
             # normal boss update
             current_boss.update()
-            screen.blit(current_boss.image, (current_boss.rect.x + shake_x, current_boss.rect.y + shake_y))
+            screen.blit(current_boss.image, (current_boss.rect.x, current_boss.rect.y))
             current_boss.bullets.update()
             current_boss.bullets.draw(screen)
 
@@ -725,6 +777,13 @@ while running:
                         powerups_module.spawn_powerup_at(powerups, current_boss.rect.centerx - 40, current_boss.rect.centery)
                     except AttributeError:
                         pass
+                    # If this was the final boss (level 15), end the game with a victory screen
+                    if level >= 15:
+                        sound.stop_background_music()
+                        game_state = GAME_OVER
+                        game_won = True
+                        current_boss = None
+                        break
                     current_boss = None 
                 break
         
@@ -818,9 +877,9 @@ while running:
         b_color = (255, 255, 0) if rapid_fire_active else WHITE
         pygame.draw.rect(screen, b_color, draw_rect)
 
-    # DRAW ENEMIES (With Shake)
+    # DRAW ENEMIES
     for enemy in enemies:
-        screen.blit(enemy_img, (enemy.x + shake_x, enemy.y + shake_y))
+        screen.blit(enemy_img, (enemy.x, enemy.y))
 
     # DRAW EXPLOSIONS
     for exp in explosions[:]:
@@ -855,6 +914,15 @@ while running:
         sh_text = font.render("SHIELD ACTIVE", True, (255, 255, 0))
         y_pos = HEIGHT - 70 if rapid_fire_active else HEIGHT - 40
         screen.blit(sh_text, (WIDTH//2 - 60, y_pos))
+
+    # Apply full-screen shake by copying the current frame and blitting with offset
+    if shake_x != 0 or shake_y != 0:
+        try:
+            frame = screen.copy()
+            screen.fill((0, 0, 0))
+            screen.blit(frame, (shake_x, shake_y))
+        except Exception:
+            pass
 
     pygame.display.flip()
 
