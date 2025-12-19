@@ -62,7 +62,7 @@ class Boss(pygame.sprite.Sprite):
         # Try to load a variant-specific image if it exists, otherwise keep the fallback
         try:
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            variant_name = self.variant or "alien_boss"
+            variant_name = self.variant if self.variant == "final_boss" else (self.variant or "alien_boss")
             img_path = os.path.join(base_dir, "images", f"{variant_name}.png")
             if os.path.exists(img_path):
                 loaded_img = pygame.image.load(img_path).convert_alpha()
