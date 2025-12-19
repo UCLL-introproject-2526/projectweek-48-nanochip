@@ -46,9 +46,14 @@ class Boss(pygame.sprite.Sprite):
             self.width = int(self.width * 1.6)
             self.height = int(self.height * 1.6)
         elif self.variant == "final_boss":
-            # Final boss is very large
+            # Final boss is very large and extremely hard
             self.width = int(self.width * 2.2)
             self.height = int(self.height * 2.2)
+            self.extra_wave_timer = pygame.time.get_ticks()
+            self.teleport_timer = pygame.time.get_ticks()
+            self.immune_timer = pygame.time.get_ticks()
+            self.immune_period = 1200  # ms
+            self.immune_cooldown = 3000  # ms
 
         # Default image surface (fallback)
         self.image = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -100,8 +105,8 @@ class Boss(pygame.sprite.Sprite):
             # Make the first boss (alien) a bit less aggressive horizontally
             self.speed_x = 3
         elif self.variant == "final_boss":
-            # Final boss slides across aggressively but not too fast
-            self.speed_x = 4
+            # Final boss moves very fast and unpredictably
+            self.speed_x = 12
         self.max_hp = 500
         self.hp = self.max_hp
         # Track which HP thresholds have already spawned powerups (avoid duplicates)
@@ -129,17 +134,30 @@ class Boss(pygame.sprite.Sprite):
             self.spread_chance = 0.50
             self.double_burst_chance = 0.15
         elif self.variant == "final_boss":
-            # Final boss: aggressive firing but with distinct patterns tuned in shoot()
-            self.shoot_delay = 500
-            self.spread_chance = 0.85
-            self.double_burst_chance = 0.45
+            # Final boss: extremely aggressive firing and bullet patterns
+            self.shoot_delay = 60
+            self.spread_chance = 1.0
+            self.double_burst_chance = 1.0
+            self.max_hp = 12000
+            self.hp = self.max_hp
         # Mark hard behavior for easy checks (Demon & Final are hard)
         self.hard_behavior = self.variant in ("sotrak_rewop", "stark_rewop", "demon_boss", "final_boss")
 
     def update(self):
         # MOVE: Bounce left and right
         self.rect.x += self.speed_x
-        
+
+        now = pygame.time.get_ticks()
+        # Final boss: unpredictable movement and teleporting
+        if self.variant == "final_boss":
+            # Randomly change direction much more often
+            if random.random() < 0.18:
+                self.speed_x = -self.speed_x
+            # Teleport every 2.5 seconds
+            if now - getattr(self, 'teleport_timer', 0) > 2500:
+                self.rect.x = random.randint(0, self.screen_width - self.width)
+                self.teleport_timer = now
+
         # Bounce off walls
         if self.rect.right >= self.screen_width:
             self.speed_x = -abs(self.speed_x) # Go Left
@@ -151,10 +169,36 @@ class Boss(pygame.sprite.Sprite):
             self.speed_x = -self.speed_x
 
         # SHOOT: Check timer
-        now = pygame.time.get_ticks()
         if now - self.last_shot_time > self.shoot_delay:
             self.shoot()
             self.last_shot_time = now
+
+        # Final boss: extra bullet waves every 1.0 seconds
+        if self.variant == "final_boss":
+            if now - getattr(self, 'extra_wave_timer', 0) > 1000:
+                # Massive spiral barrage
+                for i in range(0, 360, 18):
+                    angle_rad = math.radians(i)
+                    dx = math.cos(angle_rad) * 7
+                    dy = math.sin(angle_rad) * 7 + 10
+                    self.bullets.add(BossBullet(self.rect.centerx, self.rect.bottom, dx=dx, dy=dy, color=(255, 0, 255)))
+                # Homing bullets
+                for _ in range(6):
+                    target_x = random.randint(0, self.screen_width)
+                    dx = (target_x - self.rect.centerx) / 60.0
+                    self.bullets.add(BossBullet(self.rect.centerx, self.rect.bottom, dx=dx, dy=14, color=(0, 255, 0)))
+                self.extra_wave_timer = now
+
+            # Short immunity periods
+            if now - getattr(self, 'immune_timer', 0) > self.immune_cooldown:
+                self.immune_timer = now
+
+    def is_immune(self):
+        if self.variant == "final_boss":
+            now = pygame.time.get_ticks()
+            # Immune for short periods
+            return (now - getattr(self, 'immune_timer', 0)) < self.immune_period
+        return pygame.time.get_ticks() < getattr(self, 'spawn_immunity_until', 0)
 
     def shoot(self):
         # Hardest variants (sotrak/stark): triple spread as before
@@ -194,23 +238,21 @@ class Boss(pygame.sprite.Sprite):
                 bullet = BossBullet(self.rect.centerx, self.rect.bottom)
                 self.bullets.add(bullet)
         elif self.variant == "final_boss":
-            # Final boss: very heavy, multi-pattern attacks — wide 7-bullet spread + occasional ring/double waves
-            # Primary wide 7-bullet spread
-            angles = [(-30, -3.5), (-18, -2.2), (-9, -1.2), (0, -0.2), (9, 1.0), (18, 2.2), (30, 3.5)]
+            # Final boss: extremely aggressive bullet patterns
+            # Wide 13-bullet spread, all bullets much faster
+            angles = [(-60, -8.5), (-50, -7.2), (-40, -6.0), (-30, -4.8), (-20, -3.6), (-10, -2.4), (0, -0.2), (10, 2.4), (20, 3.6), (30, 4.8), (40, 6.0), (50, 7.2), (60, 8.5)]
             for ox, dx in angles:
-                self.bullets.add(BossBullet(self.rect.centerx + ox, self.rect.bottom, dx=dx, dy=8))
+                self.bullets.add(BossBullet(self.rect.centerx + ox, self.rect.bottom, dx=dx, dy=16))
 
-            # 30% chance to follow with a denser ring / wave
-            if random.random() < 0.30:
-                for i in range(-6, 7):
-                    self.bullets.add(BossBullet(self.rect.centerx + i*8, self.rect.bottom, dx=i*0.7, dy=6))
+            # Always follow with a dense ring/wave
+            for i in range(-12, 13):
+                self.bullets.add(BossBullet(self.rect.centerx + i*8, self.rect.bottom, dx=i*1.3, dy=13, color=(255, 100, 0)))
 
-            # 40% chance to emit a close double-wide burst as well
-            if random.random() < 0.40:
-                offset = -16 if random.random() < 0.5 else 16
-                burst = [(-12, -1.8), (-6, -0.9), (0, -0.2), (6, 0.9), (12, 1.8)]
+            # Always emit a double-wide burst
+            for offset in (-32, 32):
+                burst = [(-20, -3.8), (-10, -1.9), (0, -0.2), (10, 1.9), (20, 3.8)]
                 for ox, dx in burst:
-                    self.bullets.add(BossBullet(self.rect.centerx + ox + offset, self.rect.bottom, dx=dx, dy=7))
+                    self.bullets.add(BossBullet(self.rect.centerx + ox + offset, self.rect.bottom, dx=dx, dy=12, color=(0, 255, 255)))
         else:
             # Non-variant boss: usually single straight bullet, but occasionally fire a triple spread
             if random.random() < 0.20:  # 20% chance to fire a spread shot
